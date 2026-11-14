@@ -78,6 +78,8 @@ silinx classroom grade exercises/counter4/counter4.exercise.json --org my-course
 - `grades.csv` has one row per student: the points, the overall verdict, then each test's verdict and points. `--json`
   writes the full results.
 - `--issues` opens an issue in each student's repository with their report: a visible test's details, and for a hidden
+- `--json grades.json` can be opened in Silinx, from the Exercise document's ⋮ menu (**Class Results…**): one row per
+  student, one per test (the class's weakest first), and Export CSV ([GRADING.md](GRADING.md)).
   test its verdict and points only.
 
 The same run can be a workflow of a private repository of the teacher's, holding the exercise with its hidden tests.

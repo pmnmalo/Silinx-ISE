@@ -2,7 +2,7 @@
 // from the project's top, run on the project itself (a student's run, its visible tests) and on submissions of the
 // exchange folder (a teacher's: the CSV written there), the student's copy written; its wrong arguments; an exercise
 // authored from the project (#3831: its reference the project's design, a vectors test's outputs filled from it); its
-// Classroom template written to the exchange folder (#3841).
+// Classroom template written to the exchange folder (#3841); the class's results read back (#3864).
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -78,7 +78,7 @@ test('grade: a wrong submission\'s first difference; wrong arguments', { timeout
   assert.equal(r.text.split('\n').slice(1, 5).join('\n'), 'w: 0 / 30 points (Wrong Answer), the visible tests\n  WARNING: "src/counter4.v" Line 1: Input <en> is never used.\n  - count (Counting): WA Wrong Answer, 0 / 30\n      cycle 3 (vectors line 6): q is 0011, expected 0010');
   const err = async (args, text) => { const x = await call('grade', args); assert.deepEqual([x.isError, x.text], [true, text]); };
   await err({ project: 'nope' }, 'grade: no project \'nope\' in the workspace');
-  await err({ project: 'w', action: 'fly' }, 'grade: action: one of run, check, ports, reference, expected, student_copy, template, new');
+  await err({ project: 'w', action: 'fly' }, 'grade: action: one of run, check, ports, reference, expected, student_copy, template, results, new');
   await err({ project: 'w', exercise: 'x.json' }, 'grade: exercise: \'x.json\' is not a .exercise.json');
   await err({ project: 'w', action: 'student_copy' }, 'grade: file: the new file of the exchange folder for the student\'s copy');
   await err({ project: 'w', submissions: ['../../etc'] }, `grade: submissions: '../../etc' is outside the exchange folder (SILINX_MCP_FOLDER sets another)`);
@@ -156,4 +156,34 @@ test('#3841 grade template: the Classroom template in a new folder of the exchan
   await err({ project: 'tpl', action: 'template' }, 'grade: folder: the new folder of the exchange folder for the template');
   await err({ project: 'tpl', action: 'template', folder: 'tpl-template' }, 'grade: \'tpl-template\' is not a new folder: give another');
   await err({ project: 'tpl', action: 'template', folder: '../x' }, `grade: folder: '../x' is outside the exchange folder (SILINX_MCP_FOLDER sets another)`);
+});
+
+test('#3864 grade results: a teacher\'s run\'s results summed up per test and per student, the exercise\'s titles; the CSV; a file that is not results', { timeout: 120000 }, async () => {
+  await counterProject('cls', COUNTER_V);
+  await ok('write_file', { project: 'cls', path: 'counter4.exercise.json', text: JSON.stringify(counterExercise()) });
+  for (const [n, t] of [['ana', COUNTER_V], ['rui', COUNTER_V.replace('else if (en) q', 'else q')]]) {
+    fs.mkdirSync(path.join(xchg, 'class', n, 'src'), { recursive: true });
+    fs.writeFileSync(path.join(xchg, 'class', n, 'src/counter4.v'), t);
+    fs.writeFileSync(path.join(xchg, 'class', n, 'silinx.json'), JSON.stringify({ name: n, top: 'counter4', files: [{ path: 'src/counter4.v', lang: 'verilog' }] }));
+  }
+  const run = await ok('grade', { project: 'cls', submissions: ['class'] });
+  fs.writeFileSync(path.join(xchg, 'class.grades.json'), JSON.stringify(run.data.results, null, 2));
+  const r = await ok('grade', { project: 'cls', action: 'results', file: 'class.grades.json', csv: 'class.csv' });
+  assert.equal(r.text, `4-bit counter: 2 student(s), 1 Accepted, mean 65 / 100 points
+The tests, the weakest first:
+  count (Counting): 1 / 2 Accepted (50%), most often WA Wrong Answer (1)
+  random: 1 / 2 Accepted (50%), most often WA Wrong Answer (1) [hidden]
+  bench: 2 / 2 Accepted (100%) [hidden]
+The students:
+  ana: 100 / 100 (AC) count=AC random=AC bench=AC
+  rui: 30 / 100 (WA) count=WA random=WA bench=AC
+CSV: <exchange folder>/class.csv
+`);
+  assert.equal(r.data.summary.count, 2);
+  assert.equal(fs.readFileSync(path.join(xchg, 'class.csv'), 'utf8'), 'submission,points,max,verdict,count,count points,random,random points,bench,bench points\nana,100,100,AC,AC,30,AC,40,AC,30\nrui,30,100,WA,WA,0,WA,0,AC,30\n');
+  const err = async (args, text) => { const x = await call('grade', args); assert.deepEqual([x.isError, x.text], [true, text]); };
+  await err({ project: 'cls', action: 'results' }, 'grade: file: a results file of the exchange folder (silinx grade --json, silinx classroom grade --json)');
+  await err({ project: 'cls', action: 'results', file: 'none.json' }, 'grade: file: no file \'none.json\' in the exchange folder');
+  fs.writeFileSync(path.join(xchg, 'bad.json'), '{"a": 1}');
+  await err({ project: 'cls', action: 'results', file: 'bad.json' }, 'grade: bad.json: not a list of results (silinx grade --json writes one)');
 });

@@ -10,7 +10,9 @@
 // - a teacher's exercise authored from the project (#3831): Reference from the Project, then Expected from the Reference
 //   filling a vectors test's outputs, then graded; in Portuguese;
 // - packaged for the students (#3841): Export Student Copy and Classroom Template… saved, nothing hidden in them; in
-//   Portuguese.
+//   Portuguese;
+// - the class's results (#3864): a grades.json opened from the Files and by Class Results…, its tables, a student's
+//   report in the console, Export CSV; in Portuguese.
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -280,7 +282,7 @@ uiTest('#3841 an exercise packaged for the students: Export Student Copy and Cla
   await page.eval(() => import('/js/i18n.js').then((m) => m.setLanguage('pt')));
   await page.waitFor(() => document.documentElement.lang === 'pt');
   await page.click(`${D} .ex-bar .tb-more-btn`);
-  const items = await page.eval((d) => [...document.querySelectorAll(`${d} .ex-bar .tb-more-menu .asm-btn`)].slice(4).map((b) => `${b.textContent}: ${b.title}`), D);
+  const items = await page.eval((d) => [...document.querySelectorAll(`${d} .ex-bar .tb-more-menu .asm-btn`)].slice(4, 6).map((b) => `${b.textContent}: ${b.title}`), D);
   assert.deepEqual(items, ['Exportar a Cópia do Aluno: Guardar o exercício sem os testes escondidos e a referência, para os alunos',
     'Modelo do Classroom…: Guardar o repositório modelo de uma tarefa do GitHub Classroom como um zip']);
   await page.click(`${D} .ex-bar .tb-more-menu .asm-btn`, { text: 'Modelo do Classroom…' });
@@ -289,6 +291,72 @@ uiTest('#3841 an exercise packaged for the students: Export Student Copy and Cla
   assert.match(dlg.text, /^O repositório modelo de uma tarefa do GitHub Classroom: .*Linguagem do projeto inicial/);
   assert.deepEqual(dlg.buttons, ['Guardar o Zip', 'Cancelar']);
   await page.dialogButton('Cancelar');
+  await page.eval(() => import('/js/i18n.js').then((m) => m.setLanguage('en')));
+  await page.waitFor(() => document.documentElement.lang === 'en');
+}, { timeout: 120000 });
+
+uiTest('#3864 the class\'s results: a grades.json from the Files and by Class Results…, the tests weakest first, the students, a report in the console, Export CSV; Portuguese', E, async (page) => {
+  const { gradeTests, summarize, referenceVectors } = await import('../../core/grade.js');
+  const { csvReport } = await import('../../core/grade-report.js');
+  const ex = JSON.parse(read('counter4.exercise.json'));
+  ex.tests = ex.tests.filter((t) => t.kind === 'vectors' || t.kind === 'reference').map((t) => (t.file ? { ...t, file: undefined, vectors: read(t.file) } : t));
+  ex.reference = { files: [{ path: 'ref/counter4.vhd', text: RIGHT }] };
+  const vectors = { random: referenceVectors(ex, ex.tests[1]) };
+  const results = [];
+  for (const [n, text] of [['rui', NO_ENABLE], ['ana', RIGHT], ['eva', 'entity counter4 is']]) {
+    const sub = { project: { files: [{ path: 'src/counter4.vhd', lang: 'vhdl', role: 'design' }] }, files: new Map([['src/counter4.vhd', text]]) };
+    results.push(summarize(ex, n, await gradeTests(ex, sub, { vectors })));
+  }
+  const json = JSON.stringify(results, null, 2);
+  await makeProject(env, { name: 'cls', board: 'basys2', top: 'counter4', files: { 'src/counter4.vhd': RIGHT, 'counter4.exercise.json': read('counter4.exercise.json'), 'tests/count.vec': read('tests/count.vec'), 'runs/class.grades.json': json } });
+  await page.openProject('cls');
+  const R = '.doc:not([hidden]) .ex-results';
+  await page.eval(() => window.SilinxApp.openFile('runs/class.grades.json'));
+  await page.waitFor((d) => window.Silinx.active?.id === 'results:runs/class.grades.json' && document.querySelector(d)?.dataset.ready === '1', [R], { what: 'the results' });
+  const look = () => page.eval((d) => {
+    const el = document.querySelector(d), rows = (sel) => [...el.querySelectorAll(`${sel} tr`)].map((r) => [...r.children].map((c) => c.textContent).join(' | '));
+    return { tab: window.Silinx.active.tab.querySelector('.tlabel').textContent, buttons: [...el.querySelectorAll('.ex-bar .asm-btn')].map((b) => b.textContent),
+      heads: [...el.querySelectorAll('h3')].map((x) => x.textContent), tests: rows('.ex-class-tests'), students: rows('.ex-class-students'),
+      status: [...el.querySelectorAll('.doc-status .ds-f')].map((f) => f.textContent).join(' · ') };
+  }, R);
+  let L = await look();
+  assert.deepEqual(L, { tab: 'class.grades.json', buttons: ['Export CSV'], heads: ['Tests, the weakest first', 'Students'],
+    tests: ['Test | Shown | Points | Accepted | Most often', 'Counting and the reset | visible | 30 | 1 / 3 (33%) | WA (1)', 'Random inputs against the reference | hidden | 40 | 1 / 3 (33%) | WA (1)'],
+    students: ['Student | Points | Verdict | count | random', 'ana | 70 / 70 | AC | AC 30 | AC 40', 'eva | 0 / 70 | CE | CE 0 | CE 0', 'rui | 0 / 70 | WA | WA 0 | WA 0'],
+    status: '3 student(s) · 1 Accepted · mean 23.33 / 70 points' });
+  // a student's report in the console
+  const before = await page.eval(() => window.__console().length);
+  await page.click(`${R} .ex-class-students tr[data-student="rui"]`);
+  await page.waitFor((n) => /rui: 0 \/ 70 points \(Wrong Answer\)/.test(window.__console().slice(n)), [before], { what: 'the report' });
+  assert.match(await page.eval((n) => window.__console().slice(n), before), /rui: 0 \/ 70 points \(Wrong Answer\)\n {2}WARNING: "src\/counter4\.vhd" Line 10: Input <en> is never used\.\n {2}- count \(Counting and the reset\): WA Wrong Answer, 0 \/ 30\n {6}cycle 4/);
+  // Export CSV: --csv's
+  await page.click(`${R} .ex-bar .asm-btn`, { text: 'Export CSV' });
+  assert.equal(await fs.promises.readFile(await waitDownload(page, 'class.grades.csv'), 'utf8'), csvReport(results, ex));
+  await page.waitConsole(/class\.grades\.csv: the results of 3 student\(s\), one row per student\./);
+  // Class Results…: the same file picked from the computer
+  await page.eval(() => window.SilinxApp.closeDoc(window.SilinxApp.findDoc('results:runs/class.grades.json'), { force: true }));
+  const picked = path.join(page.downloadDir, 'picked.grades.json');
+  await fs.promises.writeFile(picked, json);
+  await page.menu('Project', 'Exercise…');
+  await page.waitFor((d) => document.querySelector(d)?.dataset.ready === '1', [D], { what: 'the exercise' });
+  await page.click(`${D} .ex-bar .tb-more-btn`);
+  await page.click(`${D} .ex-bar .tb-more-menu .asm-btn`, { text: 'Class Results…' });
+  await page.waitDialog('Class Results');
+  await page.setFiles('.dlg-overlay input[data-field=file]', [picked]);
+  await page.dialogButton('Open');
+  await page.waitFor((d) => window.Silinx.active?.id === 'results:picked.grades.json' && document.querySelector(d)?.dataset.ready === '1', [R], { what: 'the picked results' });
+  assert.deepEqual((await look()).students.slice(1), L.students.slice(1));
+  // a file that is not results: said in the console
+  await writeWs(env, 'cls', 'bad.grades.json', '{"x": 1}');
+  await page.eval(() => window.SilinxApp.openFile('bad.grades.json'));
+  await page.waitConsole(/ERROR: bad\.grades\.json: not a list of results \(silinx grade --json writes one\)/);
+  // in Portuguese
+  await page.eval(() => import('/js/i18n.js').then((m) => m.setLanguage('pt')));
+  await page.waitFor(() => document.documentElement.lang === 'pt');
+  L = await look();
+  assert.deepEqual({ buttons: L.buttons, heads: L.heads, tests: L.tests[0], students: L.students[0], status: L.status, row: L.tests[2] },
+    { buttons: ['Exportar CSV'], heads: ['Testes, o mais fraco primeiro', 'Alunos'], tests: 'Teste | Mostrado | Pontos | Aceites | Mais frequente', students: 'Aluno | Pontos | Veredicto | count | random',
+      status: '3 aluno(s) · 1 aceite(s) · média de 23.33 / 70 pontos', row: 'Random inputs against the reference | escondido | 40 | 1 / 3 (33%) | WA (1)' });
   await page.eval(() => import('/js/i18n.js').then((m) => m.setLanguage('en')));
   await page.waitFor(() => document.documentElement.lang === 'en');
 }, { timeout: 120000 });

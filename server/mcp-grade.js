@@ -5,7 +5,8 @@
 // from the Top"), its reference made of the project's design and a vectors test's outputs filled from it (Reference
 // from the Project, Expected from the Reference, #3831), the student's copy written (no hidden test, no reference),
 // and the GitHub Classroom template written to a new folder of the exchange folder (#3841, as Classroom Template…).
-// The grading is server/grade.js's: each submission in a process of its own, within the exercise's limits.
+// The class's results of a teacher's run read back (#3864, as the Results document: core/grade-class.js). The grading is
+// server/grade.js's: each submission in a process of its own, within the exercise's limits.
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
@@ -15,9 +16,10 @@ import { exchangePath } from './mcp-transfer.js';
 import { isExerciseFile, exerciseProblems, visibleCopy, localize, newExercise, exerciseFileOf, withFileTexts } from '../core/grade-format.js';
 import { projectReference } from '../core/grade-author.js';
 import { starterProject, templateFiles, STARTER_LANGUAGES } from '../core/grade-package.js';
+import { parseResults, classSummary, classCsv, classText } from '../core/grade-class.js';
 import { textReport, csvReport } from '../core/grade-report.js';
 
-const ACTIONS = ['run', 'check', 'ports', 'reference', 'expected', 'student_copy', 'template', 'new'];
+const ACTIONS = ['run', 'check', 'ports', 'reference', 'expected', 'student_copy', 'template', 'results', 'new'];
 
 // the exercise of the project the tool names: its file (by default the project's only *.exercise.json)
 async function exerciseFile(name, given) {
@@ -74,6 +76,26 @@ async function writeTemplate(name, rel, ex, folder, lang) {
     data: { project: name, exercise: rel, folder: dir, files: [...files.keys()] } };
 }
 
+// the class's results (#3864): a results file of the exchange folder summed up per test and per student, the tests in
+// the order of the project's exercise when it has the results' one; the CSV written to a new file of the exchange folder
+async function classResults(name, given, file, csv, lang) {
+  if (!file) throw toolError('file: a results file of the exchange folder (silinx grade --json, silinx classroom grade --json)');
+  const full = await exchangePath(file, 'file');
+  let text;
+  try { text = await fsp.readFile(full, 'utf8'); } catch { throw toolError(`file: no file '${file}' in the exchange folder`); }
+  const r = parseResults(text, file);
+  if (r.problems.length) throw toolError(r.problems.join('\n'));
+  let ex = null;
+  const all = given ? [given] : (await P.fileTree(name)).filter(isExerciseFile);
+  for (const rel of all) {
+    try { const x = JSON.parse(await projectText(name, rel, rel)); if (x?.id === r.exercise && Array.isArray(x.tests)) { ex = x; break; } } catch { /* not that exercise */ }
+  }
+  const s = classSummary(r.results, ex);
+  const out = csv ? await writeNew(csv, classCsv(r.results, s), 'csv') : null;
+  return { text: `${classText(s, ex ? localize(ex.title, lang) : r.exercise || '')}${out ? `CSV: ${out}\n` : ''}`, data: { project: name, exercise: r.exercise, summary: s, ...(out && { csv: out }) },
+    untrusted: 'the results file\'s students\' names and tests' };
+}
+
 /** The ports of the project's top as an exercise states them: [{ name, dir, width }] (the reference's top). */
 export async function topPorts(name) {
   const v = await elaborateView(name, {});
@@ -92,14 +114,14 @@ async function writeNew(p, text, what) {
 export const GRADE_TOOLS = [
   {
     name: 'grade', title: 'Grade an exercise',
-    description: 'Automatic grading, as `silinx grade` and the Exercise document (Project ▸ Exercise…): run (the exercise\'s tests on the project itself, or on submissions of the exchange folder: project folders, zips, or a folder of them; each test\'s verdict, Accepted, Wrong Answer, Compile Error, Interface Error, Not Synthesizable, Latch Inferred, Time Limit Exceeded, Memory Limit Exceeded, Runtime Error, Resource / Timing Limit or Grading Error (the grader could not run it), and its points; visible: the visible tests only, as a student runs them; csv: the results written to a new file of the exchange folder), check (the exercise\'s problems), ports (the project\'s top and its ports written into the exercise, as "Ports from the Top"), reference (the exercise\'s reference design made of the project\'s design, as "Reference from the Project"), expected (a vectors test\'s rows filled with the reference\'s outputs, as "Expected from the Reference": the teacher writes the inputs only), student_copy (the exercise without its hidden tests and its reference, written to a new file of the exchange folder), template (the GitHub Classroom assignment\'s template repository, as Classroom Template… and `silinx classroom template`: the starter project made from the statement, the student\'s copy with its visible tests\' files, README.md, the workflow; written to a new folder of the exchange folder), new (a new exercise of the project\'s top, as New Exercise: its ports and a first visible test, <top>.exercise.json).',
+    description: 'Automatic grading, as `silinx grade` and the Exercise document (Project ▸ Exercise…): run (the exercise\'s tests on the project itself, or on submissions of the exchange folder: project folders, zips, or a folder of them; each test\'s verdict, Accepted, Wrong Answer, Compile Error, Interface Error, Not Synthesizable, Latch Inferred, Time Limit Exceeded, Memory Limit Exceeded, Runtime Error, Resource / Timing Limit or Grading Error (the grader could not run it), and its points; visible: the visible tests only, as a student runs them; csv: the results written to a new file of the exchange folder), check (the exercise\'s problems), ports (the project\'s top and its ports written into the exercise, as "Ports from the Top"), reference (the exercise\'s reference design made of the project\'s design, as "Reference from the Project"), expected (a vectors test\'s rows filled with the reference\'s outputs, as "Expected from the Reference": the teacher writes the inputs only), student_copy (the exercise without its hidden tests and its reference, written to a new file of the exchange folder), template (the GitHub Classroom assignment\'s template repository, as Classroom Template… and `silinx classroom template`: the starter project made from the statement, the student\'s copy with its visible tests\' files, README.md, the workflow; written to a new folder of the exchange folder), results (the class\'s results of a teacher\'s run, a results file of the exchange folder written by `silinx grade --json` or `silinx classroom grade --json`, as the Results document: each test\'s Accepted and most frequent other verdict, the weakest first, each student\'s verdicts; csv: the CSV), new (a new exercise of the project\'s top, as New Exercise: its ports and a first visible test, <top>.exercise.json).',
     inputSchema: { type: 'object', properties: {
-      project: PROJECT, action: { type: 'string', enum: ACTIONS, description: 'run (default), check, ports, reference, expected, student_copy, template or new.' },
+      project: PROJECT, action: { type: 'string', enum: ACTIONS, description: 'run (default), check, ports, reference, expected, student_copy, template, results or new.' },
       exercise: STR('The exercise: a .exercise.json of the project (default: its only one).'),
       submissions: { type: 'array', items: { type: 'string' }, description: 'run: submissions in the exchange folder (project folders, zips, or folders of them); none: the project itself.' },
       visible: { type: 'boolean', description: 'run: the visible tests only (a student\'s run).' },
-      csv: STR('run: a new file of the exchange folder for the results as a CSV.'),
-      file: STR('student_copy: the new file of the exchange folder it is written to.'),
+      csv: STR('run, results: a new file of the exchange folder for the results as a CSV.'),
+      file: STR('student_copy: the new file of the exchange folder it is written to; results: the results file of the exchange folder.'),
       folder: STR('template: the new folder of the exchange folder it is written to.'),
       starter_language: { type: 'string', enum: STARTER_LANGUAGES, description: 'template: the starter project\'s language (default: the project\'s).' },
       test: STR('expected: the vectors test to fill (its id; default: the exercise\'s only vectors test).'),
@@ -115,6 +137,7 @@ export const GRADE_TOOLS = [
         await P.writeFile(name, out, `${JSON.stringify(newExercise(tp), null, 2)}\n`);
         return { text: `${out}: a new exercise of ${tp.top}, its ports from the top and a first visible test.`, data: { project: name, exercise: out, top: tp.top, ports: tp.ports } };
       }
+      if (action === 'results') return classResults(name, exercise, file, csv, lang);
       const rel = await exerciseFile(name, exercise);
       const full = await projectPath(name, rel);
       const { loadExercise, gradeAll, gradeSubmission, readSubmission, referenceVectorsOf } = await import('./grade.js');
