@@ -1,7 +1,8 @@
 // A graded exercise (#3192, core/grade-format.js) as a document: a project's *.exercise.json opened from the Files or
 // by Project ▸ Exercise… (which makes one when the project has none: its top and ports, a first visible test). As every
 // viewer (docs/UI-GUIDELINES.md): its toolbar (Add Test, Delete Test, Run Visible Tests, ☰ Properties on a narrow
-// screen, the ⋮ menu's Run All Tests and Ports from the Top), the statement in the interface's language, the ports, the
+// screen, the ⋮ menu's Run All Tests, Ports from the Top, Reference from the Project and Expected from the Reference,
+// #3831: a teacher's exercise made from the project that holds the right design), the statement in the interface's language, the ports, the
 // tests with their verdicts and points once run, the Properties side panel on the right (the exercise's title,
 // statement and top, the selected test's settings: web/js/exercise-props.js), its status line, and every message in the
 // console. The tests run on the project as it is saved, in the page (core/grade.js, the grading of `silinx grade` and of
@@ -22,6 +23,7 @@ import { browserSynthesize } from './grade-synth-browser.js';
 import { isExerciseFile, exerciseProblems, localize, testsOf, pointsOf, withFileTexts, newExercise, exerciseFileOf, VERDICTS } from '/core/grade-format.js';
 import { gradeTests, summarize, referenceVectors } from '/core/grade.js';
 import { exerciseUnitNames, submissionSources } from '/core/grade-design.js';
+import { projectReference, expectedFromReference } from '/core/grade-author.js';
 import { textReport } from '/core/grade-report.js';
 import { compile, elaborate } from '/core/compile.js';
 import { primitiveSources } from '/core/unisim.js';
@@ -104,7 +106,9 @@ function mountExercise(el, doc, path, ex) {
     h('div', { class: 'asm-spacer' }),
     h('div', { class: 'asm-group' }, panelToggle(root, h('button', { type: 'button', class: 'asm-btn asm-wide', 'data-panel': 'props', title: 'Show / hide the Properties panel' }, '☰ Properties'), { key: PROPS_KEY })),
     toolbarMenu([btn('Run All Tests', 'Run every test of the exercise, the hidden ones too', 'run-all', () => run(false)),
-      btn('Ports from the Top', 'The exercise\'s top and ports: the project\'s top module\'s', 'ports-from-top', () => portsFromTop())], { title: 'The exercise', btnClass: 'asm-btn' }).el));
+      btn('Ports from the Top', 'The exercise\'s top and ports: the project\'s top module\'s', 'ports-from-top', () => portsFromTop()),
+      btn('Reference from the Project', 'The exercise\'s reference design: the project\'s design', 'reference-from-project', () => referenceFromProject()),
+      btn('Expected from the Reference', 'The selected vectors test\'s outputs: the reference design\'s, on its rows\' inputs', 'expected-from-reference', () => expectedOutputs())], { title: 'The exercise', btnClass: 'asm-btn' }).el));
   const page = h('div', { class: 'ex-page' });
   const side = h('aside', { class: 'ex-side' }, h('div', { class: 'asm-cap' }, 'Properties'));
   root.append(h('div', { class: 'ex-main' }, page, side), line.el);
@@ -165,6 +169,32 @@ function mountExercise(el, doc, path, ex) {
     props.render();
     edited();
   }
+  const dir = path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : '';
+  // Reference from the Project (#3831): the exercise's reference, the project's design as it is saved (its files by their
+  // paths, read when the tests run; a drawing's HDL written in)
+  async function referenceFromProject() {
+    await saveAll();
+    const { reference, problems } = projectReference(await projectSubmission(name), dir);
+    if (problems.length) { for (const m of problems) log(`ERROR: no reference made: ${m}`, 'err'); return; }
+    ex.reference = reference;
+    log(`${path}: the reference, the project's design: ${reference.files.map(f => f.path).join(', ')}`, 'ok', { diag: false });
+    edited();
+  }
+  // Expected from the Reference (#3831): the selected vectors test's rows filled with the reference's outputs, where its
+  // text is (the exercise, or its file beside it)
+  async function expectedOutputs() {
+    const x = ex.tests?.[sel];
+    if (x?.kind !== 'vectors') { log('ERROR: Expected from the Reference fills a vectors test: select one.', 'err'); return; }
+    await saveAll();
+    const read = await withFileTexts(ex, p => api.readFile(name, p), dir);
+    const r = read.problems.length ? { problems: read.problems.map(m => `${path}: ${m}`) } : expectedFromReference(read.exercise, read.exercise.tests[sel]);
+    if (r.problems.length) { for (const m of r.problems) log(`ERROR: test ${x.id}: ${m}`, 'err'); return; }
+    const file = typeof x.vectors !== 'string' && typeof x.file === 'string' ? (dir ? `${dir}/${x.file}` : x.file) : null;
+    if (file) await api.writeFile(name, file, r.text);
+    else x.vectors = r.text;
+    log(`${file || path}: test ${x.id}, the expected outputs of its ${r.rows} row(s) from the reference.`, 'ok', { diag: false });
+    if (!file) { props.render(); edited(); } else { results = null; render(); }
+  }
   // (the equivalence tests' Yosys, as Verify Equivalence's: the page's worker, #3217)
   const yosys = async (...a) => (await (await import('./emulator.js')).emulatorYosys(api.standalone))(...a);
   async function run(visible) {
@@ -174,7 +204,6 @@ function mountExercise(el, doc, path, ex) {
       await saveAll();   // (as Check Syntax: the documents saved first, the exercise too)
       log(`\nStarted : "${visible ? 'Run Visible Tests' : 'Run All Tests'}" (${path}).\n`, 'hdr');
       // (its files beside it, as silinx grade reads them: from the project, the exercise's folder)
-      const dir = path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : '';
       const read = await withFileTexts(ex, p => api.readFile(name, p), dir);
       const problems = [...read.problems.map(m => `${path}: ${m}`), ...exerciseProblems(read.exercise, path)];
       if (problems.length) { for (const m of problems) log(`ERROR: ${m}`, 'err'); log('Process "Run Tests" failed: the exercise has problems.', 'err', { diag: false }); return; }

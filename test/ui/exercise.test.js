@@ -6,7 +6,9 @@
 // - the teacher's edits in the Properties panel, saved (the points, a test added and deleted, the ports from the top);
 // - the panel folded (remembered), over the page behind ☰ Properties on a narrow window;
 // - in Portuguese;
-// - a project with no exercise: New Exercise makes one from its top.
+// - a project with no exercise: New Exercise makes one from its top;
+// - a teacher's exercise authored from the project (#3831): Reference from the Project, then Expected from the Reference
+//   filling a vectors test's outputs, then graded; in Portuguese.
 import { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -191,4 +193,47 @@ uiTest('#3217 an equivalence test: the design proved equivalent to the reference
   out = await runVisible();
   assert.match(out, /eqv: 20 \/ 20 points \(Accepted\), the visible tests\n {2}\+ same \(Equivalent to the reference\): AC Accepted, 20 \/ 20\n {6}equivalent to the reference for every input sequence \(proved by induction over 1 clock cycle\(s\)\)\nProcess "Run Visible Tests" completed: 20 \/ 20 points\./, out);
   assert.doesNotMatch(out, /WARNING|ERROR/);
+}, { timeout: 120000 });
+
+uiTest('#3831 an exercise authored from the project: Reference from the Project, Expected from the Reference filling the rows written, then graded; Portuguese', E, async (page) => {
+  await makeProject(env, { name: 'author', board: 'basys2', top: 'counter4', files: { 'src/counter4.vhd': RIGHT } });
+  await page.openProject('author');
+  await page.menu('Project', 'Exercise…');
+  await page.waitDialog('Exercise');
+  await page.dialogButton('New Exercise');
+  await page.waitFor((d) => window.Silinx.active?.id === 'exercise:counter4.exercise.json' && document.querySelector(d)?.dataset.ready === '1', [D], { what: 'the new exercise' });
+  const menu = async (text) => { await page.click(`${D} .ex-bar .tb-more-btn`); await page.click(`${D} .ex-bar .tb-more-menu .asm-btn`, { text }); };
+  const vectors = () => page.eval((d) => document.querySelector(`${d} [data-prop="test-vectors"]`).value, D);
+  // the teacher writes the rows' inputs only
+  await page.click(`${D} .ex-test`, { index: 0 });
+  await page.fill(`${D} [data-prop="test-vectors"]`, 'rst en | q\n1 0\n0 1\n0 1\n0 0\n0 1\n');
+  await page.waitFor(() => !window.Silinx.active.dirty, [], { what: 'saved' });
+  // (no reference yet: said in the console)
+  await menu('Expected from the Reference');
+  await page.waitConsole(/ERROR: test vectors: the exercise has no reference design \(Reference from the Project makes it of the project's\)/);
+  await menu('Reference from the Project');
+  await page.waitConsole(/counter4\.exercise\.json: the reference, the project's design: src\/counter4\.vhd/);
+  await page.waitFor(() => !window.Silinx.active.dirty, [], { what: 'saved' });
+  assert.deepEqual(JSON.parse(await readWs(env, 'author', 'counter4.exercise.json')).reference, { files: [{ path: 'src/counter4.vhd', file: 'src/counter4.vhd' }] });
+  await menu('Expected from the Reference');
+  await page.waitConsole(/counter4\.exercise\.json: test vectors, the expected outputs of its 5 row\(s\) from the reference\./);
+  assert.equal(await vectors(), 'rst en | q\n1 0 | 0\n0 1 | 1\n0 1 | 2\n0 0 | 2\n0 1 | 3\n');
+  await page.waitFor(() => !window.Silinx.active.dirty, [], { what: 'saved' });
+  assert.equal(JSON.parse(await readWs(env, 'author', 'counter4.exercise.json')).tests[0].vectors, 'rst en | q\n1 0 | 0\n0 1 | 1\n0 1 | 2\n0 0 | 2\n0 1 | 3\n');
+  // the exercise graded on the project: Accepted, no warning
+  const before = await page.eval(() => window.__console().length);
+  await page.click(`${D} .ex-bar .asm-btn`, { text: 'Run Visible Tests' });
+  await page.waitFor((n) => /Process "Run Visible Tests" (completed|failed)/.test(window.__console().slice(n)), [before], { what: 'the tests run', timeout: 60000 });
+  const out = await page.eval((n) => window.__console().slice(n), before);
+  assert.match(out, /author: 10 \/ 10 points \(Accepted\), the visible tests\n {2}\+ vectors \(Vectors\): AC Accepted, 10 \/ 10\nProcess "Run Visible Tests" completed: 10 \/ 10 points\./, out);
+  assert.doesNotMatch(out, /WARNING|ERROR/);
+  // in Portuguese: the ⋮ menu's labels
+  await page.eval(() => import('/js/i18n.js').then((m) => m.setLanguage('pt')));
+  await page.waitFor(() => document.documentElement.lang === 'pt');
+  await page.click(`${D} .ex-bar .tb-more-btn`);
+  const items = await page.eval((d) => [...document.querySelectorAll(`${d} .ex-bar .tb-more-menu .asm-btn`)].map((b) => `${b.textContent}: ${b.title}`), D);
+  assert.deepEqual(items, ['Executar Todos os Testes: Executar todos os testes do exercício, também os escondidos', 'Portos do Topo: O topo e os portos do exercício: os do módulo de topo do projeto',
+    'Referência do Projeto: O desenho de referência do exercício: o desenho do projeto', 'Esperado da Referência: As saídas do teste de vetores selecionado: as do desenho de referência, nas entradas das suas linhas']);
+  await page.eval(() => import('/js/i18n.js').then((m) => m.setLanguage('en')));
+  await page.waitFor(() => document.documentElement.lang === 'en');
 }, { timeout: 120000 });

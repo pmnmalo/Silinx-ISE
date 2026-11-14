@@ -144,10 +144,20 @@ the interface's language, the ports, and the tests with their verdicts and point
   - **Run All Tests** (in the ⋮ menu) runs the hidden tests too.
   - **Ports from the Top** takes the top and its ports from the project's top module, so the teacher's reference
     project states them.
+  - **Reference from the Project** (in the ⋮ menu) makes the project's design the exercise's reference.
+    - A file inside the exercise's folder is listed by its path (`{ "path", "file" }`), so the reference follows the
+      design as the teacher edits it.
+    - A drawing's HDL, or a file outside the folder, is written into the exercise.
+  - **Expected from the Reference** (in the ⋮ menu) fills the selected vectors test's outputs from the reference. The
+    teacher writes only the rows' inputs, such as `rst en | q` then `1 0`, `0 1`, ….
+    - The reference runs each row, and its outputs replace whatever the row had after its `|`.
+    - The inputs, the comments and the header stay as written.
+    - Each output is written in its column's style: decimal when the column has no value yet, binary, or `0x…`.
+    - An X or Z of the reference is `-`, not compared.
   - **Add Test** and **Delete Test**, and the **Properties** panel, edit the title, the statement, the top and the
     selected test's settings.
 
-The MCP server's `grade` tool does each of these (run, ports, new).
+The MCP server's `grade` tool does each of these (run, ports, reference, expected, new).
 
 ## The example
 

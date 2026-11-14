@@ -202,6 +202,15 @@ export async function referenceVectorsOf(ex) {
   return out;
 }
 
+/** A vectors test (`test`, its text read) filled from the exercise's reference (core/grade-author.js
+ *  expectedFromReference: { text, rows, problems }), computed in a grading process as the reference tests' rows are. */
+export async function expectedOf(ex, test) {
+  const limits = limitsOf(ex, test);
+  let got = null;
+  const r = await runProcess({ type: 'expected', exercise: ex, test }, { memoryMb: limits.memoryMb, seconds: limits.seconds * 2, onMessage: m => { if (m.type === 'expected') got = m.expected; } });
+  return got || { text: null, rows: 0, problems: [r.timedOut ? `the reference took more than ${limits.seconds * 2} s` : `the reference could not run: ${r.stderr.split('\n').find(Boolean) || `exit ${r.code}`}`] };
+}
+
 /** One submission graded: core/grade.js summarize's result. `vectors`: the reference tests' (referenceVectorsOf). */
 export async function gradeSubmission(ex, sub, { visible = false, vectors = {}, exerciseUnits = [], synthesis } = {}) {
   const tests = testsOf(ex, { visible });
