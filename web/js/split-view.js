@@ -15,6 +15,7 @@ import { DESIGN_ICON, taskOfDoc } from './tasks.js';
 import { prefKey } from './prefs.js';
 import { moveTab, mountTabOrder, orderTabs } from './tab-order.js';
 import { mountTabSight } from './tab-sight.js';
+import { layoutToggled } from './layout-fit.js';
 
 export { tabTip } from './tab-order.js';
 export { tabInSight } from './tab-sight.js';
@@ -27,7 +28,7 @@ const ICON = '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="
 let on = false;       // split
 let target = 'a';     // the side worked in: where a document opened goes
 let seen = [];        // the documents brought to the front, the last one last
-let groups = null, divider = null, empty = null, button = null, watched = false;
+let groups = null, divider = null, empty = null, button = null, watched = false, shownSplit = false;
 let ratio = (() => { try { const r = parseFloat(localStorage.getItem(prefKey(RATIO_KEY))); return r > 0.1 && r < 0.9 ? r : 0.5; } catch { return 0.5; } })();
 
 const tasks = () => document.documentElement.dataset.layout === 'tasks';
@@ -214,6 +215,8 @@ function layout() {
   }
   if (empty) empty.classList.toggle('pane-front', !!vacant && vacant === front);
   dispatchEvent(new Event('resize'));
+  // (split or unsplit: the drawings on display zoomed to Full View in their new room, #3804)
+  if (!!p !== shownSplit) { shownSplit = !!p; layoutToggled(); }
 }
 
 // stacked: the lower side's tabs over its pane (from the workspace's top, in the centre's frame)
