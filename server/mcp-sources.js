@@ -146,7 +146,7 @@ export const SOURCE_TOOLS = [
   },
   {
     name: 'rename_module', title: 'Rename a module',
-    description: 'Rename a module (an entity or a module of the project\'s HDL files), as Rename does: its declaration and its instances in every source, the schematics\' symbols of it, the drawing it is generated from (named after it, it follows), the project\'s top and test bench. Its file follows the new name when it is named after the module (file: another path, or keep to leave it); the drawings changed make their HDL again.',
+    description: 'Rename a module (an entity or a module of the project\'s HDL files), as Rename does: its declaration and its instances in every source, the schematics\' symbols of it (their layout kept), its symbol file (<module>.sym.json: the module\'s name in it, a file named after the module following it, beside its file), the drawing it is generated from (named after it, it follows), the project\'s top and test bench. Its file follows the new name when it is named after the module (file: another path, or keep to leave it); the drawings changed make their HDL again.',
     inputSchema: { type: 'object', properties: { project: PROJECT, module: STR('The module\'s name now.'), to: STR('Its new name (a letter, then letters, digits and _).'), file: STR('Its file\'s new path, or keep (default: the file with the new name when it is named after the module).') }, required: ['project', 'module', 'to'], additionalProperties: false },
     annotations: { readOnlyHint: false, destructiveHint: false },
     async run({ project: name, module: oldName, to: newName, file }) {

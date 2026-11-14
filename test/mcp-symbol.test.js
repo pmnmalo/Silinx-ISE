@@ -112,3 +112,32 @@ test('place_instance: a 4-bit register from a 1-bit one, reg(3:0), its pins on n
   await fails('place_instance', { project: 'a', path: 'src/top.sch.json', module: 'reg1', x: 0, y: 0, connect: { z: 'a' } }, /module 'reg1' has no port 'z'/);
   await fails('place_instance', { project: 'a', path: 'src/top.sch.json', module: 'nobody', x: 0, y: 0 }, /no module 'nobody'/);
 });
+
+test('#3829 rename_module: its symbol file renamed with it, the module\'s name in it; the instances keep their layout', async () => {
+  await ok('new_project', { name: 'r' });
+  await ok('write_file', { project: 'r', path: 'src/reg1.vhd', text: REG });
+  await ok('write_file', { project: 'r', path: 'src/top.vhd', text: 'entity top is end top;\narchitecture a of top is begin end a;\n' });
+  await ok('write_file', { project: 'r', path: 'src/top.sch.json', text: JSON.stringify(schematic()) });
+  await ok('edit_symbol', { project: 'r', module: 'reg1', pins: [{ name: 'c', side: 'S' }, { name: 'Q', side: 'W' }], spacing: 30 });
+  assert.equal((await ok('update_symbols', { project: 'r', path: 'src/top.sch.json' })).data.updated[0], 'U1');
+  const hdl0 = (await ok('read_file', { project: 'r', path: 'src/top.vhd' })).text;
+  const r = await ok('rename_module', { project: 'r', module: 'reg1', to: 'bit_reg' });
+  assert.equal(r.text.split('\n')[0], 'Rename: module \'reg1\' renamed to \'bit_reg\' (4 file(s) updated); src/reg1.vhd → src/bit_reg.vhd; src/reg1.sym.json → src/bit_reg.sym.json.');
+  assert.deepEqual(r.data.moved, [{ from: 'src/reg1.vhd', to: 'src/bit_reg.vhd' }, { from: 'src/reg1.sym.json', to: 'src/bit_reg.sym.json' }]);
+  const tree = (await ok('project_info', { project: 'r' })).text;
+  assert.doesNotMatch(tree, /reg1\.sym\.json/);
+  const file = JSON.parse((await ok('read_file', { project: 'r', path: 'src/bit_reg.sym.json' })).text);
+  assert.deepEqual(file, { version: 1, kind: 'symbol', module: 'bit_reg', pins: [{ name: 'c', side: 'S' }, { name: 'q', side: 'W' }, { name: 'd', side: 'W' }, { name: 'ce', side: 'W' }], spacing: 30, width: null, height: null, title: 'top' });
+  assert.match((await ok('read_symbol', { project: 'r', module: 'bit_reg' })).text, /^bit_reg: its symbol src\/bit_reg\.sym\.json: left: q, d, ce; bottom: c; spacing 30/);
+  // the instance: its module the new name, its layout the symbol's, nothing out of date; its HDL the same but the name
+  assert.equal((await ok('update_symbols', { project: 'r', path: 'src/top.sch.json' })).text, 'src/top.sch.json: no symbol out of date');
+  const doc = JSON.parse((await ok('read_file', { project: 'r', path: 'src/top.sch.json' })).text);
+  assert.deepEqual([doc.symbols[0].params.module, doc.symbols[0].params.ports.map(q => `${q.name}:${q.side}`)], ['bit_reg', ['c:S', 'q:W', 'd:W', 'ce:W']]);
+  assert.equal((await ok('read_file', { project: 'r', path: 'src/top.vhd' })).text, hdl0.replace(/\breg1\b/g, 'bit_reg'));
+  const syn = await ok('check_syntax', { project: 'r', top: 'top' });
+  assert.doesNotMatch(syn.text, /ERROR|WARNING/);
+  // the file kept (file: keep): the symbol file still named after the module, beside it
+  const k = await ok('rename_module', { project: 'r', module: 'bit_reg', to: 'r1', file: 'keep' });
+  assert.deepEqual(k.data.moved, [{ from: 'src/bit_reg.sym.json', to: 'src/r1.sym.json' }]);
+  assert.equal(JSON.parse((await ok('read_file', { project: 'r', path: 'src/r1.sym.json' })).text).module, 'r1');
+});

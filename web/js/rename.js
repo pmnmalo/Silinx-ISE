@@ -117,6 +117,15 @@ async function renameSource(from, to, oldMod, newMod) {
         if (d.generatedFile === from) { d.generatedFile = to; changed.set(f, JSON.stringify(d, null, /\.(asm|tt|bool|fsm)\.json$/i.test(f) ? 2 : 1)); }
       }
     }
+    // its symbol (#3829): the module's name in it, the file named after the module following it and its file
+    if (oldMod && (moved.has(from) || (newMod && newMod !== oldMod))) {
+      const { isSymbolFile, renameSymbolFile } = await import('/core/symbol-layout.js');
+      const syms = {};
+      for (const f of S.fileTree.filter(isSymbolFile)) { try { syms[f] = await api.readFile(pj.name, f); } catch { /* skip */ } }
+      const sym = renameSymbolFile(syms, moved.get(from) || from, oldMod, newMod || oldMod);
+      if (sym && sym.text !== syms[sym.from]) changed.set(sym.from, sym.text);
+      if (sym && sym.to !== sym.from) moved.set(sym.from, sym.to);
+    }
     // close the editors of files that move or change (reopened below)
     const reopen = [];
     for (const d of [...S.docs]) {
