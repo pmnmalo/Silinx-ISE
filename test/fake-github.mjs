@@ -15,7 +15,7 @@ export function fakeGitHub({ clientId = 'Iv1.fake-client-id', tokens = ['gho_fak
   const gists = new Map();   // id -> { public, description, owner, files }
   const devices = new Map();   // device_code -> { userCode, state: 'pending' | 'authorized' | 'denied', polls }
   const scopes = [];           // the scope each device code asked for (#3356)
-  let clock = 0;
+  let clock = 0, checkId = 1000;
 
   const json = (status, body, headers = {}) => ({ status, body, headers });
   const nope = () => json(404, { message: 'Not Found' });
@@ -146,6 +146,15 @@ export function fakeGitHub({ clientId = 'Iv1.fake-client-id', tokens = ['gho_fak
       for (let s = start; s; s = r.commits.get(s).parents[0]) line.push(s);
       return json(200, line.slice((page - 1) * per, page * per).map(sha => { const c = r.commits.get(sha); return { sha, commit: { message: c.message, author: { name: c.author, date: c.date } }, author: { login: c.author } }; }));
     }
+    if ((x = /^\/commits\/([^/]+)\/check-runs$/.exec(rest)) && method === 'GET') {   // (#3194: a commit's checks)
+      const ref = decodeURIComponent(x[1]), sha = r.refs.get(ref) || ref;
+      const runs = (r.checks?.get(sha) || []).map(c => ({ id: c.id, name: c.name, status: c.status, conclusion: c.conclusion ?? null, html_url: `https://github.com/${full}/runs/${c.id}`, head_sha: sha, output: { title: c.title ?? null, summary: null, annotations_count: (c.annotations || []).length } }));
+      return json(200, { total_count: runs.length, check_runs: runs });
+    }
+    if ((x = /^\/check-runs\/(\d+)\/annotations$/.exec(rest)) && method === 'GET') {
+      const c = [...(r.checks?.values() || [])].flat().find(k => String(k.id) === x[1]);
+      return c ? json(200, (c.annotations || []).map(a => ({ path: '.github', start_line: 1, end_line: 1, annotation_level: a.level, title: a.title, message: a.message }))) : nope();
+    }
     if ((x = /^\/commits\/([0-9a-f]{40})$/.exec(rest)) && method === 'GET') {
       const c = r.commits.get(x[1]);
       if (!c) return nope();
@@ -233,5 +242,7 @@ export function fakeGitHub({ clientId = 'Iv1.fake-client-id', tokens = ['gho_fak
     authorize: userCode => { deviceOf(userCode).state = 'authorized'; },
     deny: userCode => { deviceOf(userCode).state = 'denied'; },
     revoke: t => valid.delete(t),
+    // a commit's check runs, as GitHub Actions makes them (#3194): [{ name, status, conclusion, annotations: [{ level, title, message }] }]
+    setChecks: (full, sha, runs) => { const r = repos.get(full); r.checks ||= new Map(); r.checks.set(sha, runs.map(c => ({ id: ++checkId, ...c }))); },
   };
 }

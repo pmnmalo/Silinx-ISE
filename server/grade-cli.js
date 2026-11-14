@@ -1,13 +1,15 @@
 // `silinx grade` (#3192): an exercise's tests over submissions (server/grade.js), a text report per submission on
-// stdout, the results as JSON (--json) and as a CSV (--csv); --visible, the visible tests only (a student's run);
+// stdout, the results as JSON (--json), as a CSV (--csv) and as GitHub's workflow commands, an annotation per verdict
+// (--annotations, #3194: the Classroom workflow's); --visible, the visible tests only (a student's run);
 // --student-copy, the exercise without its hidden tests and its reference (the student's copy, #3193). The exit status:
 // 0 when every submission is Accepted, 2 when one is not, 1 when the exercise or the command is wrong.
 import fs from 'node:fs';
 import { gradeAll, loadExercise } from './grade.js';
 import { textReport, csvReport } from '../core/grade-report.js';
+import { annotationsText } from '../core/grade-annotations.js';
 import { visibleCopy } from '../core/grade-format.js';
 
-const VALUED = ['json', 'csv', 'student-copy'];
+const VALUED = ['json', 'csv', 'annotations', 'student-copy'];
 
 /** The command's run on its arguments: the exit status. out / err: where the texts go. */
 export async function gradeCommand(args, { out, err }) {
@@ -32,6 +34,7 @@ export async function gradeCommand(args, { out, err }) {
   if (problems.length) { err(`${problems.join('\n')}\n`); return 1; }
   if (opt('json')) fs.writeFileSync(opt('json'), `${JSON.stringify(results, null, 2)}\n`);
   if (opt('csv')) fs.writeFileSync(opt('csv'), csvReport(results, ex));
+  if (opt('annotations')) fs.writeFileSync(opt('annotations'), annotationsText(results));
   const ok = results.filter(r => r.verdict === 'AC').length;
   out(`${ok} of ${results.length} submission(s) Accepted\n`);
   return ok === results.length ? 0 : 2;
