@@ -29,6 +29,7 @@ import { panelToggle, PROPS_KEY } from './narrow.js';
 import {
   normalizeFsm, newFsm, validateFsm, outputLines, FSM_ENCODINGS, STATE_R,
 } from '/core/fsm.js';
+import { styleOf } from '/core/fsm-style.js';
 import { mountSide } from './fsm-side.js';
 import { mountRender } from './fsm-render.js';
 import { copyDrawing, pasteDrawing, drawingClipEmpty } from '/core/drawclip.js';
@@ -53,16 +54,18 @@ const CHW = 7.3;                       // width of a 12px monospace character
 export const textW = (s) => String(s).length * CHW;
 
 /** A state's texts in its circle: its name's baseline, the divider's height and its outputs, one per line (#3882),
- *  the block centred on the circle's centre. */
+ *  the block centred on the circle's centre; k: their size's scale, its look's text size (#3883: 1 by default). */
 export function stateTexts(s) {
-  const lines = outputLines(s.outputs), up = 7 * Math.max(0, lines.length - 1);
-  return { name: lines.length ? -4 - up : 5, divider: 3 - up, outs: lines.map((text, i) => ({ text, y: 17 + 14 * i - up })) };
+  const k = (styleOf('state', s).fontSize ?? 13) / 13;
+  const lines = outputLines(s.outputs), up = 7 * k * Math.max(0, lines.length - 1);
+  return { k, name: lines.length ? -4 * k - up : 5 * k, divider: 3 * k - up, outs: lines.map((text, i) => ({ text, y: (17 + 14 * i) * k - up })) };
 }
 
 /** Radius of a state circle (grows with its texts: each line's ends inside the circle). */
 export function radiusOf(s) {
-  const t = stateTexts(s), inside = (text, y) => Math.ceil(Math.hypot(textW(text) / 2, Math.max(Math.abs(y - 10), Math.abs(y + 3)))) + 4;
-  return Math.max(STATE_R, Math.ceil(textW(s.name) * 1.1 / 2) + 12, ...t.outs.map((o) => Math.max(Math.ceil(textW(o.text) / 2) + 10, inside(o.text, o.y))));
+  const t = stateTexts(s), k = t.k, w = (text) => textW(text) * k;
+  const inside = (text, y) => Math.ceil(Math.hypot(w(text) / 2, Math.max(Math.abs(y - 10 * k), Math.abs(y + 3 * k)))) + 4;
+  return Math.max(STATE_R, Math.ceil(w(s.name) * 1.1 / 2) + 12, ...t.outs.map((o) => Math.max(Math.ceil(w(o.text) / 2) + 10, inside(o.text, o.y))));
 }
 
 // (read-only, #2696: the tools that change the diagram, Check, the ⋮ menu (Layout and conversion, the HDL's settings)

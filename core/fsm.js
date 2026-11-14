@@ -13,9 +13,10 @@
 //     style: '3process' | '2process',            (HDL style: separate or combined logic processes)
 //     inputs:  [{ name: 'x', width: 1 }],
 //     outputs: [{ name: 'z', width: 1, default: '0' }],
-//     states: [{ id, name: 'S0', x, y, outputs: { z: '1' } }],            (Moore outputs)
+//     states: [{ id, name: 'S0', x, y, outputs: { z: '1' },              (Moore outputs)
+//                look?: { fill, stroke, … } }],                           (its look: core/fsm-style.js, #3883)
 //     transitions: [{ id, from, to, cond: 'x && !y', outputs: { z: '1' },  (Mealy outputs)
-//                     bend?: px, angle?: deg }],                          (drawing of the arc)
+//                     bend?: px, angle?: deg, look?: { stroke, dash, … } }], (drawing of the arc, its look)
 //     initial: '<state id>',
 //     description?, generatedFile?, base?
 //   }
@@ -37,6 +38,7 @@ import { asmFromHdl } from './asm-from-hdl.js';
 import { asmToFsm, fsmToAsm } from './fsm-asm.js';
 import { generateFsm } from './fsm-hdl.js';
 import { clone } from './util.js';
+import { normalizeStyle, styleProblems } from './fsm-style.js';
 export { clone };   // (core/util.js's)
 export { generateFsm } from './fsm-hdl.js';
 export { asmToFsm, fsmToAsm } from './fsm-asm.js';
@@ -146,6 +148,8 @@ export function normalizeFsm(m) {
   const states = arr(src.states).map((s, i) => {
     const o = { id: String(s?.id ?? `s${i + 1}`), name: String(s?.name ?? ''), x: num(s?.x), y: num(s?.y), outputs: normOutputs(s?.outputs) };
     if (s?.comment) o.comment = String(s.comment);
+    const st = normalizeStyle('state', s?.look);
+    if (st) o.look = st;
     return o;
   });
   const transitions = arr(src.transitions).map((t, i) => {
@@ -154,6 +158,8 @@ export function normalizeFsm(m) {
     if (/^(1|true|always)$/i.test(o.cond)) o.cond = '';
     if (t?.bend != null && Number.isFinite(Number(t.bend))) o.bend = Number(t.bend);
     if (t?.angle != null && Number.isFinite(Number(t.angle))) o.angle = Number(t.angle);
+    const st = normalizeStyle('trans', t?.look);
+    if (st) o.look = st;
     return o;
   });
   const out = {
@@ -435,6 +441,9 @@ export function validateFsm(model) {
     checkOutputs(t.outputs, where, ref);
   }
   const hasErrors = out.some((d) => d.severity === 'error');
+  // (a look's values not valid, #3883: drawn with the default look, the HDL not concerned; after hasErrors, the analysis made)
+  for (const s of m.states) for (const e of styleProblems('state', s.look)) add('error', `State ${s.name || '?'}: ${e}`, { state: s.id });
+  for (const t of m.transitions) for (const e of styleProblems('trans', t.look)) add('error', `Transition ${nameOf(m, t.from)} → ${nameOf(m, t.to)}: ${e}`, { transition: t.id });
 
   // reachability (only transitions whose condition can be true)
   const W = (n) => widthOf.get(n) ?? 1;

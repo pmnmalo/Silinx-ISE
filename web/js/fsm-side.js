@@ -3,8 +3,9 @@
 // machine's (its name, clock and reset, inputs and outputs, encoding). mountSide(ctx) is called by mountFsmEditor
 // where this code was. A state's or a transition's outputs: a table of the machine's outputs, its value editable
 // (core/fsm-outputs.js, #3814; a value refused: the console, flash(text)). No Delete button: a state or a transition is
-// deleted as any selection is, by the Delete key or the toolbar's (#3882).
+// deleted as any selection is, by the Delete key or the toolbar's (#3882). Its look last: web/js/fsm-look.js (#3883).
 import { h } from './ui.js';
+import { lookFields } from './fsm-look.js';
 import { outputLines } from '/core/fsm.js';
 import { dropOutputValues, outputRows, outputsWhere, renameOutputValues, setOutputValue } from '/core/fsm-outputs.js';
 
@@ -83,7 +84,8 @@ export function mountSide(ctx) {
         // (a transition's outputs one per line under it, #3882)
         h('ol', { class: 'fsm-tlist' }, ...ts.map((t) => h('li', { class: 'link', onclick: () => { setSel({ type: 'trans', id: t.id }); render(); renderSide(); } },
           `${t.cond || '1'} → ${stateById(t.to)?.name ?? '?'}${outputLines(t.outputs).length ? ' /' : ''}`,
-          ...outputLines(t.outputs).map((o) => h('div', { class: 'mono fsm-tout' }, o)))))].filter(Boolean));
+          ...outputLines(t.outputs).map((o) => h('div', { class: 'mono fsm-tout' }, o))))),
+        ...look('state', cur, id)].filter(Boolean));
       return;
     }
     const t = transById(sel().id);
@@ -115,8 +117,11 @@ export function mountSide(ctx) {
       h('div', { class: 'asm-row' },
         btn('▲ Earlier', 'Try this condition before the previous one', () => move(-1), 'asm-small'),
         btn('▼ Later', 'Try this condition after the next one', () => move(1), 'asm-small'),
-        btn('Straighten', 'Default shape of the arrow', () => { const c = cur(); if (c) { delete c.bend; delete c.angle; commit(); } }, 'asm-small')));
+        btn('Straighten', 'Default shape of the arrow', () => { const c = cur(); if (c) { delete c.bend; delete c.angle; commit(); } }, 'asm-small')),
+      ...look('trans', cur, id));
   }
+  const look = (kind, obj, id) => lookFields({ kind, obj, host: selSection, commit, flash, field, btn, refresh: () => renderSide(),
+    where: () => outputsWhere(M(), { type: kind, id }) });
 
   function renderMachine() {
     machineBody.textContent = '';

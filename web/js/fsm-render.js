@@ -2,13 +2,33 @@
 // self-loop's direction away from the other arrows, its label's place), the states with their codes and the initial
 // one, the transitions with their labels, the selection, the problems and, while simulating, the current state and
 // transition. mountRender(ctx) is called by mountFsmEditor where this code was. A state's or a transition's outputs: one
-// per line (#3882), a transition's under its condition, the block growing away from its arrow.
+// per line (#3882), a transition's under its condition, the block growing away from its arrow. A state's or a
+// transition's look (#3883, core/fsm-style.js): its colours and widths as CSS variables of its group, which the
+// editor's CSS reads with the default look's values as their fallbacks (a colour not chosen: the theme's; the
+// selection, a problem and the simulation still drawn over it), its texts' inline; an arc's colour, its arrowhead's
+// too (a marker per colour).
 import { fsmEncoding, outputLines, stepFsm } from '/core/fsm.js';
+import { styleOf, textCss } from '/core/fsm-style.js';
 import { sv, radiusOf, stateTexts, textW } from './fsm-editor.js';
 
 /** { encOf, geom, render } of an FSM editor (state(): its current model, selection, problems, simulation). */
 export function mountRender(ctx) {
   const { state, uid, gEdges, gStates, stateById, updateToolbar } = ctx;
+
+  // (a look's CSS variables, only those it sets: none, the default look)
+  const vars = (pairs) => pairs.filter(([, v]) => v != null).map(([k, v]) => `${k}:${v}`).join(';') || null;
+  const DASH = { dashed: [5, 3], dotted: [0, 2.5] };
+  const dashOf = (st) => (DASH[st.dash] ? DASH[st.dash].map((x) => Math.round(x * (st.strokeWidth ?? 1.6) * 100) / 100).join(' ') : null);
+  // (the arrowhead of an arc of a colour of its own: a marker of that colour, made once)
+  function markerOf(colour) {
+    const id = `${uid}-arr-${colour.slice(1)}`, defs = gEdges.ownerSVGElement?.querySelector('defs');
+    if (defs && !defs.querySelector(`#${id}`)) {
+      const m = sv('marker', { id, viewBox: '0 0 10 10', refX: 9, refY: 5, markerWidth: 8, markerHeight: 8, orient: 'auto-start-reverse', markerUnits: 'userSpaceOnUse' });
+      m.append(sv('path', { d: 'M0,1 L10,5 L0,9 z', class: 'fsm-arrowhead', style: `fill:${colour}` }));
+      defs.append(m);
+    }
+    return id;
+  }
 
   const encOf = () => { const { M } = state(); try { return new Map(fsmEncoding(M).map((e) => [e.id, e])); } catch { return new Map(); } };
   function defaultBend(t) {
@@ -87,18 +107,19 @@ export function mountRender(ctx) {
       if (!g) continue;
       const isSel = sel?.type === 'trans' && sel.id === t.id;
       const cls = ['fsm-edge', isSel ? 'sel' : '', bad.get(t.id) ? (bad.get(t.id) === 'error' ? 'err' : 'warn') : '', hot === t.id ? 'hot' : ''].filter(Boolean).join(' ');
-      const marker = isSel ? `${uid}-arr-sel` : hot === t.id ? `${uid}-arr-hot` : `${uid}-arr`;
-      const grp = sv('g', { class: cls, 'data-trans': t.id });
+      const st = styleOf('trans', t), k = (st.fontSize ?? 12) / 12;
+      const marker = isSel ? `${uid}-arr-sel` : hot === t.id ? `${uid}-arr-hot` : st.stroke && !bad.get(t.id) ? markerOf(st.stroke) : `${uid}-arr`;
+      const grp = sv('g', { class: cls, 'data-trans': t.id, style: vars([['--fsm-edge', st.stroke], ['--fsm-ew', st.strokeWidth], ['--fsm-dash', dashOf(st)], ['--fsm-cap', st.dash === 'dotted' ? 'round' : null]]) });
       grp.append(sv('path', { class: 'fsm-hit', d: g.d }), sv('path', { class: 'fsm-edge-line', d: g.d, 'marker-end': `url(#${marker})` }));
       const lines = labelLines(t);
       if (lines.length || isSel) {
         const shown = lines.length ? lines : ['…'];
-        const w = Math.max(14, ...shown.map(textW)) + 8, hgt = 14 * shown.length + 4;
+        const w = Math.max(14, ...shown.map((l) => textW(l) * k)) + 8, hgt = 14 * k * shown.length + 4;
         const x0 = g.anchor === 'start' ? g.lab.x - 4 : g.anchor === 'end' ? g.lab.x - w + 4 : g.lab.x - w / 2;
         // (several lines: beside the arrow, centred on its place; above or below it, growing away from it)
         const y0 = shown.length === 1 || g.anchor !== 'middle' ? g.lab.y - hgt / 2 : g.out.y < 0 ? g.lab.y + 9 - hgt : g.lab.y - 9;
-        const text = sv('text', { class: `fsm-label${lines.length ? '' : ' empty'}`, x: g.lab.x, y: y0 + 13, 'text-anchor': g.anchor });
-        shown.forEach((l, i) => text.append(sv('tspan', { x: g.lab.x, dy: i ? 14 : 0 }, l)));
+        const text = sv('text', { class: `fsm-label${lines.length ? '' : ' empty'}`, x: g.lab.x, y: y0 + 13 * k, 'text-anchor': g.anchor, style: (lines.length && textCss(st, 12)) || null });
+        shown.forEach((l, i) => text.append(sv('tspan', { x: g.lab.x, dy: i ? 14 * k : 0 }, l)));
         grp.append(sv('rect', { class: 'fsm-label-bg', x: x0, y: y0, width: w, height: hgt, rx: 4 }), text);
       }
       gEdges.append(grp);
@@ -107,18 +128,20 @@ export function mountRender(ctx) {
       const r = radiusOf(s);
       const isSel = sel?.type === 'state' && sel.id === s.id;
       const cls = ['fsm-state', isSel ? 'sel' : '', s.id === M.initial ? 'initial' : '', bad.get(s.id) ? (bad.get(s.id) === 'error' ? 'err' : 'warn') : '', sim?.state === s.id ? 'current' : ''].filter(Boolean).join(' ');
-      const grp = sv('g', { class: cls, 'data-state': s.id, transform: `translate(${s.x},${s.y})` });
+      const st = styleOf('state', s);
+      const grp = sv('g', { class: cls, 'data-state': s.id, transform: `translate(${s.x},${s.y})`,
+        style: vars([['--fsm-fill', st.fill], ['--fsm-stroke', st.stroke], ['--fsm-sw', st.strokeWidth]]) });
       if (s.id === M.initial) {
         grp.append(sv('path', { class: 'fsm-entry', d: `M${-r - 38},0 L${-r - 6},0`, 'marker-end': `url(#${uid}-arr)` }));
       }
       grp.append(sv('circle', { class: 'fsm-rim', r: r + 6 }), sv('circle', { class: 'fsm-circle', r }));
       if (s.id === M.initial) grp.append(sv('circle', { class: 'fsm-circle-in', r: r - 5 }));
       const tx = stateTexts(s);
-      grp.append(sv('text', { class: 'fsm-name', x: 0, y: tx.name, 'text-anchor': 'middle' }, s.name || '?'));
+      grp.append(sv('text', { class: 'fsm-name', x: 0, y: tx.name, 'text-anchor': 'middle', style: textCss(st, 13) || null }, s.name || '?'));
       if (tx.outs.length) {
         const half = Math.sqrt(Math.max(0, r * r - tx.divider * tx.divider)) * 0.72;
         grp.append(sv('line', { class: 'fsm-divider', x1: -half, y1: tx.divider, x2: half, y2: tx.divider }));
-        for (const o of tx.outs) grp.append(sv('text', { class: 'fsm-outs', x: 0, y: o.y, 'text-anchor': 'middle' }, o.text));
+        for (const o of tx.outs) grp.append(sv('text', { class: 'fsm-outs', x: 0, y: o.y, 'text-anchor': 'middle', style: textCss(st, 13, 12) || null }, o.text));
       }
       const e = enc.get(s.id);
       if (e) grp.append(sv('text', { class: 'fsm-code', x: r * 0.72 + 4, y: -r * 0.72 - 2 }, e.bits));

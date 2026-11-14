@@ -73,3 +73,20 @@ test('table messages, editor texts with names and the out-of-sync reasons are tr
   assert.equal(LOCALES.pt.strings.Default, 'Predefinida');
   for (const [k, v] of Object.entries(FSM_PT)) assert.ok(LOCALES.pt.strings[k] === v || LOCALES.pt.strings[k], k);
 });
+
+test('#3883 a look\'s messages (Check\'s, with the state or the transition, and Properties\', alone) and its labels in Portuguese', async () => {
+  const { styleValue } = await import('../core/fsm-style.js');
+  const m = normalizeFsm({ inputs: [{ name: 'x', width: 1 }], states: [{ id: 'a', name: 'A', look: { fill: 'blue', stroke: '#1', strokeWidth: 0, color: 'x', fontSize: 2, textStyle: 'heavy', font: 'x', dash: 'dashed' } },
+    { id: 'b', name: 'B' }], transitions: [{ id: 't1', from: 'a', to: 'b', cond: 'x', look: { stroke: 'red', strokeWidth: 20, dash: 'wavy', color: '#zzz', fontSize: 7.5, textStyle: 'x', font: 'x' } },
+    { id: 't2', from: 'b', to: 'a', look: 'red' }], initial: 'a' });
+  const msgs = validateFsm(m).filter((d) => /look|colour|size|width|style|font/.test(d.message)).map((d) => d.message);
+  assert.equal(msgs.length, 16);
+  for (const x of msgs) assert.notEqual(t(x), x, x);
+  assert.deepEqual(msgs.map(t).slice(0, 2), ["Estado A: a cor de preenchimento 'blue' não é uma cor: #rrggbb (p.ex. #ffcc00)", "Estado A: a cor do contorno '#1' não é uma cor: #rrggbb (p.ex. #ffcc00)"]);
+  assert.equal(t(styleValue('trans', 'strokeWidth', '0').error), "a largura da linha '0' tem de ser um número de 0.5 a 10");
+  assert.equal(t(styleValue('state', 'fontSize', 50).error), 'o tamanho do texto 50 tem de ser um número inteiro de 6 a 48');
+  assert.equal(t('Transition A → B: its look must be an object { stroke }'), 'Transição A → B: o seu aspeto tem de ser um objeto { stroke }');
+  for (const l of ['Look', 'Fill colour', 'Border colour', 'Border width', 'Text colour', 'Line colour', 'Line width', 'Line style', 'Text size', 'Text style', 'Font',
+    'Default (name bold)', 'Regular', 'Bold', 'Italic', 'Bold italic', 'Sans-serif', 'Serif', 'Monospace', 'Solid', 'Dashed', 'Dotted', 'Default look',
+    'Back to the colour of the theme', 'Draw it with the default look, in the colours of the theme']) assert.notEqual(t(l), l, l);
+});
