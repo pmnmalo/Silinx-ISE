@@ -666,3 +666,23 @@ test('#3548 bundleEntries: a text that is not a bundle is none (the import reads
   assert.deepEqual(r.warnings, ['silinx.json is not a project description: an empty project']);
   assert.deepEqual(r.files, {});
 });
+
+// Windows's file ids are 64 bits (NTFS: the record number, the sequence number high), past a Number's precision: two
+// files of a folder may have the same Number ino, never the same bigint one (#3878)
+test('#3878 a file is not the project\'s silinx.json for a file id alike only as a Number', async (t) => {
+  const dir = fs.mkdtempSync(path.join(HERE, '..', '.tmp-3878-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  fs.writeFileSync(path.join(dir, 'silinx.json'), '{}');
+  fs.writeFileSync(path.join(dir, 'top.v'), '');
+  const ids = { 'silinx.json': 0x1234_0000_0000_0001n, 'top.v': 0x1234_0000_0000_0002n };
+  const stat = fsp.stat;
+  t.mock.method(fsp, 'stat', async (p, opts) => {
+    const s = await stat(p, opts), id = ids[path.basename(p)];
+    if (opts?.bigint) return Object.assign(s, { dev: 7n, ino: id });
+    return Object.assign(s, { dev: 7, ino: Number(id) });
+  });
+  assert.equal(Number(ids['top.v']), Number(ids['silinx.json']), 'the two ids are alike as Numbers');
+  assert.equal(await P.isProjectFileAt(dir, path.join(dir, 'top.v')), false);
+  assert.equal(await P.isProjectFileAt(dir, path.join(dir, 'silinx.json')), true);
+  assert.equal(await P.isProjectFileAt(dir, path.join(dir, 'missing.v')), false);
+});
