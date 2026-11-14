@@ -174,14 +174,16 @@ export function generateXst({ top, device, impl = {}, includeDirs = [] }) {
 }
 
 /**
- * Contents of the bitgen option file (.ut). The full option set below was verified with the
- * Spartan-3 families (3/3A/3AN/3A DSP/3E); other families get a conservative set of options that
- * bitgen accepts on all of them (everything else keeps ISE's defaults).
+ * Contents of the bitgen option file (.ut). The full option set below is the Spartan-3 families'
+ * (3/3A/3AN/3A DSP/3E), less what a family's bitgen does not take; other families get a conservative
+ * set of options (everything else keeps ISE's defaults). Each option checked against `bitgen -help
+ * <family>` of ISE 14.7 (#3869, test/server-units.test.js).
  */
 export function generateUt({ impl = {}, family = 'spartan3e', binary = false } = {}) {
   const startup = /^cclk$/i.test(impl.startupClk || '') ? 'Cclk' : /^userclk$/i.test(impl.startupClk || '') ? 'UserClk' : 'JtagClk';
   if (!/^spartan3/.test(family || '')) {
-    return ['-w', '-g DebugBitstream:No', `-g Binary:${binary ? 'yes' : 'no'}`, '-g CRC:Enable', '-g UnusedPin:PullDown', '-g UserID:0xFFFFFFFF',
+    // (the Zynq's bitgen has no DebugBitstream, #3869)
+    return ['-w', ...(family === 'zynq' ? [] : ['-g DebugBitstream:No']), `-g Binary:${binary ? 'yes' : 'no'}`, '-g CRC:Enable', '-g UnusedPin:PullDown', '-g UserID:0xFFFFFFFF',
       `-g StartUpClk:${startup}`, '-g DONE_cycle:4', '-g GTS_cycle:5', '-g GWE_cycle:6', '-g Security:None', ''].join('\n');
   }
   return [
@@ -189,7 +191,8 @@ export function generateUt({ impl = {}, family = 'spartan3e', binary = false } =
     '-g DebugBitstream:No',
     `-g Binary:${binary ? 'yes' : 'no'}`,
     '-g CRC:Enable',
-    '-g ConfigRate:1',
+    // (the Spartan-3's CCLK from 3 MHz: its bitgen's default, 6; #3869)
+    `-g ConfigRate:${family === 'spartan3' ? 6 : 1}`,
     '-g ProgPin:PullUp',
     '-g DonePin:PullUp',
     '-g TckPin:PullUp',
@@ -198,7 +201,8 @@ export function generateUt({ impl = {}, family = 'spartan3e', binary = false } =
     '-g TmsPin:PullUp',
     '-g UnusedPin:PullDown',
     '-g UserID:0xFFFFFFFF',
-    '-g DCMShutdown:Disable',
+    // (the Spartan-3A's and 3A DSP's bitgen has no DCMShutdown: ISE's build stopped, Bitgen:38; #3869)
+    ...(/^spartan3a/.test(family) ? [] : ['-g DCMShutdown:Disable']),
     `-g StartUpClk:${startup}`,
     '-g DONE_cycle:4',
     '-g GTS_cycle:5',
