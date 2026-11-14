@@ -454,8 +454,8 @@ uiTest('RTL and Technology Schematic in Portuguese: the palette, its tooltips, t
   await page.treeRow('#procs', 'View RTL Schematic', { dbl: true, exact: true });
   await page.waitFor(() => window.Silinx.active?.id === 'rtl:top' && document.querySelectorAll('.doc:not([hidden]) .se-svg [data-kind=sym]').length >= 5, [], { what: 'RTL schematic' });
   const rtl = await viewerTexts(page);
-  // (the constant: the display's decimal points, #983; the HDL block first: the inputs read through btnOn / swOn, #3710)
-  assert.deepEqual(rtl.kinds, ['wire', 'sym:hdlblock', 'sym:module', 'sym:slice', 'sym:constant', 'sym:and2b1', 'port', 'label']);
+  // (the constant: the display's decimal points, #983; the HDL block first: the inputs read through btnOn / swOn, #3710) (a junction dot an object of its own, #3806: clicked, its properties translated too, #3818)
+  assert.deepEqual(rtl.kinds, ['wire', 'junction', 'sym:hdlblock', 'sym:module', 'sym:slice', 'sym:constant', 'sym:and2b1', 'port', 'label']);
   assert.deepEqual(rtl.untranslated, []);
   for (const s of ['Propriedades', '<--Todos os Símbolos-->', '@Inversor', '@Porta AND de 2, 3 ou 4 entradas, as entradas e as entradas invertidas nas suas propriedades (bit a bit quando Largura > 1)', 'Fio · rede clk', "Rede 'clk', 1 bit",
     'Módulo prescaler', 'Parâmetros', 'vazio = valor por omissão do módulo', 'Pinos (3)', 'Índice do MSB', 'Marcador de E/S', 'Bidirecional', 'Nome de Rede',
@@ -468,7 +468,7 @@ uiTest('RTL and Technology Schematic in Portuguese: the palette, its tooltips, t
   await page.treeRow('#procs', 'View Technology Schematic', { dbl: true, exact: true });
   await waitTech(page, 'top');
   const tech = await viewerTexts(page);
-  assert.deepEqual(tech.kinds, ['wire', 'sym:module', 'sym:constant', 'sym:slice', 'sym:busjoin', 'port', 'label']);
+  assert.deepEqual(tech.kinds, ['wire', 'junction', 'sym:module', 'sym:constant', 'sym:slice', 'sym:busjoin', 'port', 'label']);
   assert.deepEqual(tech.untranslated, []);
   for (const s of ['Propriedades', '⬆ Subir', 'Módulo LUT3', 'Pinos (4)', 'Larguras das entradas (MSB primeiro)', 'Função do LUT (INIT)'])
     assert.ok(tech.pt.has(s), `${s}: ${[...tech.pt].join(' | ')}`);
