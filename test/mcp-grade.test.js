@@ -1,6 +1,7 @@
 // The MCP server's grade tool (server/mcp-grade.js, #3192, #2674): an exercise of a project checked, its ports taken
 // from the project's top, run on the project itself (a student's run, its visible tests) and on submissions of the
-// exchange folder (a teacher's: the CSV written there), the student's copy written; its wrong arguments.
+// exchange folder (a teacher's: the CSV written there), the student's copy written; its wrong arguments; an exercise
+// authored from the project (#3831: its reference the project's design, a vectors test's outputs filled from it).
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -76,7 +77,7 @@ test('grade: a wrong submission\'s first difference; wrong arguments', { timeout
   assert.equal(r.text.split('\n').slice(1, 5).join('\n'), 'w: 0 / 30 points (Wrong Answer), the visible tests\n  WARNING: "src/counter4.v" Line 1: Input <en> is never used.\n  - count (Counting): WA Wrong Answer, 0 / 30\n      cycle 3 (vectors line 6): q is 0011, expected 0010');
   const err = async (args, text) => { const x = await call('grade', args); assert.deepEqual([x.isError, x.text], [true, text]); };
   await err({ project: 'nope' }, 'grade: no project \'nope\' in the workspace');
-  await err({ project: 'w', action: 'fly' }, 'grade: action: one of run, check, ports, student_copy, new');
+  await err({ project: 'w', action: 'fly' }, 'grade: action: one of run, check, ports, reference, expected, student_copy, new');
   await err({ project: 'w', exercise: 'x.json' }, 'grade: exercise: \'x.json\' is not a .exercise.json');
   await err({ project: 'w', action: 'student_copy' }, 'grade: file: the new file of the exchange folder for the student\'s copy');
   await err({ project: 'w', submissions: ['../../etc'] }, `grade: submissions: '../../etc' is outside the exchange folder (SILINX_MCP_FOLDER sets another)`);
@@ -95,4 +96,37 @@ test('#3217 grade: an equivalence test on the project, proved; the student\'s co
   assert.equal(r.text, '4-bit counter\neqv: 20 / 20 points (Accepted)\n  + same: AC Accepted, 20 / 20\n      equivalent to the reference for every input sequence (proved by induction over 1 clock cycle(s))\n');
   const copy = await ok('grade', { project: 'eqv', action: 'student_copy', file: 'eqv-student.exercise.json' });
   assert.deepEqual(copy.data.tests, []);
+});
+
+test('#3831 grade reference and expected: the exercise\'s reference the project\'s design, a vectors test\'s outputs filled from it (in the exercise, in its file)', { timeout: 120000 }, async () => {
+  await counterProject('teach', COUNTER_V);
+  await ok('grade', { project: 'teach', action: 'new' });
+  const ref = await ok('grade', { project: 'teach', action: 'reference' });
+  assert.equal(ref.text, 'counter4.exercise.json: the reference, the project\'s design: src/counter4.v');
+  const read = async () => JSON.parse((await ok('read_file', { project: 'teach', path: 'counter4.exercise.json' })).text);
+  assert.deepEqual((await read()).reference, { files: [{ path: 'src/counter4.v', file: 'src/counter4.v' }] });
+  // the teacher writes the inputs only
+  const ex = await read();
+  ex.tests[0].vectors = 'rst en | q\n1 0\n0 1\n0 1\n0 0\n';
+  ex.tests.push({ id: 'more', visible: true, points: 5, kind: 'vectors', clock: 'clk', file: 'tests/more.vec' });
+  await ok('write_file', { project: 'teach', path: 'counter4.exercise.json', text: JSON.stringify(ex) });
+  await ok('write_file', { project: 'teach', path: 'tests/more.vec', text: 'rst en | q\n1 1 | 0x0\n0 1\n' });
+  const exp = await ok('grade', { project: 'teach', action: 'expected', test: 'vectors' });
+  assert.equal(exp.text, 'counter4.exercise.json: test vectors, the expected outputs of its 4 row(s) from the reference\nrst en | q\n1 0 | 0\n0 1 | 1\n0 1 | 2\n0 0 | 2\n');
+  assert.equal((await read()).tests[0].vectors, 'rst en | q\n1 0 | 0\n0 1 | 1\n0 1 | 2\n0 0 | 2\n');
+  const more = await ok('grade', { project: 'teach', action: 'expected', test: 'more' });
+  assert.equal(more.data.file, 'tests/more.vec');
+  assert.equal((await ok('read_file', { project: 'teach', path: 'tests/more.vec' })).text, 'rst en | q\n1 1 | 0x0\n0 1 | 0x1\n');
+  // the exercise then graded on the project: every test Accepted, no warning
+  const run = await ok('grade', { project: 'teach' });
+  assert.equal(run.text, 'counter4\nteach: 15 / 15 points (Accepted)\n  + vectors (Vectors): AC Accepted, 10 / 10\n  + more: AC Accepted, 5 / 5\n');
+  // its wrong arguments
+  const err = async (args, text) => { const x = await call('grade', args); assert.deepEqual([x.isError, x.text], [true, text]); };
+  await err({ project: 'teach', action: 'expected' }, 'grade: test: counter4.exercise.json has 2 vectors tests (vectors, more): give one');
+  await err({ project: 'teach', action: 'expected', test: 'nope' }, 'grade: test: \'nope\' is not a vectors test of counter4.exercise.json (vectors, more)');
+  await ok('write_file', { project: 'teach', path: 'counter4.exercise.json', text: JSON.stringify({ ...ex, reference: undefined }) });
+  await err({ project: 'teach', action: 'expected', test: 'vectors' }, 'grade: test vectors: the exercise has no reference design (Reference from the Project makes it of the project\'s)');
+  await ok('write_file', { project: 'teach', path: 'src/counter4.v', text: 'module counter4(' });
+  await ok('grade', { project: 'teach', action: 'reference' });
+  await err({ project: 'teach', action: 'expected', test: 'vectors' }, 'grade: test vectors: the reference: "src/counter4.v" Line 1: expected identifier but found \'eof\'\ntest vectors: the reference: "" Line 1: top module \'counter4\' not found');
 });

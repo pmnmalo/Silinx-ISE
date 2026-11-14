@@ -3,9 +3,11 @@
 //   { type: 'grade', exercise, submission: { project, files: [[path, text]] }, from, visible, vectors, exerciseUnits }
 //     -> { type: 'design', design }, then per test { type: 'start', k } and { type: 'test', k, result }
 //   { type: 'reference', exercise, test } -> { type: 'vectors', vectors } (a reference test's expected rows)
+//   { type: 'expected', exercise, test } -> { type: 'expected', expected } (a vectors test filled from the reference, #3831)
 // Whatever a module prints goes to stderr: stdout is the protocol's.
 import { gradeTests, referenceVectors } from '../core/grade.js';
 import { prepareDesign } from '../core/grade-design.js';
+import { expectedFromReference } from '../core/grade-author.js';
 
 const send = m => process.stdout.write(`${JSON.stringify(m)}\n`);
 console.log = console.info = console.warn = (...a) => process.stderr.write(`${a.join(' ')}\n`);
@@ -17,6 +19,8 @@ const job = JSON.parse(input);
 const ex = job.exercise;
 if (job.type === 'reference') {
   send({ type: 'vectors', vectors: referenceVectors(ex, ex.tests.find(t => t.id === job.test)) });
+} else if (job.type === 'expected') {
+  send({ type: 'expected', expected: expectedFromReference(ex, job.test) });
 } else {
   const submission = { project: job.submission.project, files: new Map(job.submission.files) };
   const exerciseUnits = new Set(job.exerciseUnits || []);
