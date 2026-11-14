@@ -489,11 +489,42 @@ test('the relay\'s limits: followers per room, rooms, a follower\'s frame size (
   await until(() => docFile(fol.doc, 'src/top.vhd')?.startsWith('-- kept'), 'the edit after it');
   assert.equal(fol.closed(), false);
   assert.deepEqual(errors, []);
-  // (the owner's connection lost, not closed by Stop Sharing: the room ends, the follower told)
+  // (#3835: the owner's connection lost, not closed by Stop Sharing: the room kept for its resume, the follower with
+  // it; resumed, an edit still arrives; then Stop Sharing ends it, the follower told)
   [...relay.rooms.values()][0].owner.terminate();
+  await until(() => !owner.connected(), 'the owner\'s loss');
+  await until(() => owner.connected(), 'the room resumed');
+  assert.equal(relay.rooms.size, 1);
+  assert.equal(fol.closed(), false);
+  owner.doc.getMap('files').get('src/top.vhd').insert(0, '-- resumed\n');
+  await until(() => docFile(fol.doc, 'src/top.vhd')?.startsWith('-- resumed'), 'the edit after the resume');
+  await owner.close();
   await until(() => fol.closed(), 'the follower closed');
   assert.equal(relay.rooms.size, 0);
   relay.close();
   await new Promise(r => s.close(r));
   assert.ok(COLORS.includes(colorOf(5)));
+});
+
+test('#3835 the relay keeps a room its owner\'s connection left for RELAY_LIMITS.grace (2 minutes), then ends it: the followers told why', async () => {
+  assert.equal(RELAY_LIMITS.grace, 120_000);
+  const s = http.createServer();
+  const relay = attachRelay(s, { limits: { ...RELAY_LIMITS, grace: 100 } });
+  await new Promise(r => s.listen(0, '127.0.0.1', r));
+  const at = role => `ws://127.0.0.1:${s.address().port}/api/collab/${role}`;
+  const owner = await shareRoom({ url: at('share'), doc: owned(), user: { name: 'Ana' }, reconnect: false });
+  let why = null;
+  const fol = await followRoom({ url: at('follow'), room: owner.room, key: owner.key, user: { name: 'Rui' }, onEvent: e => { if (e.type === 'closed') why = e.reason; } });
+  await fol.ready;
+  const t0 = Date.now();
+  [...relay.rooms.values()][0].owner.terminate();
+  await until(() => owner.closed(), 'the owner\'s session ended');
+  assert.equal(relay.rooms.size, 1);
+  assert.equal(fol.closed(), false);
+  await until(() => fol.closed(), 'the follower closed');
+  assert.ok(Date.now() - t0 >= 90, `closed after ${Date.now() - t0} ms`);
+  assert.equal(relay.rooms.size, 0);
+  assert.equal(why, 'the owner\'s connection was lost');
+  relay.close();
+  await new Promise(r => s.close(r));
 });

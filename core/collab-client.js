@@ -3,7 +3,9 @@
 // (server/collab-relay.js) over a WebSocket:
 // at its share endpoint (the owner: the server's token in the subprotocols, `silinx-collab`, `token.<token>`) or its
 // follow endpoint (a follower: `silinx-collab`):
-//   text frames, JSON, the control:  { type: 'open', client }        -> { type: 'opened', room }   (the owner)
+//   text frames, JSON, the control:  { type: 'open', client }        -> { type: 'opened', room, resume }   (the owner;
+//                                    resume: the secret of its room's { type: 'resume', room, resume, client } -> the
+//                                    same, its connection lost, #3835)
 //                                    { type: 'join', room, client }  -> { type: 'joined', owner }  (a follower; the
 //                                                                       owner's client id)
 //                                    the relay's { type: 'join' | 'leave', client }, { type: 'closed', reason },
@@ -168,10 +170,16 @@ async function applyEdit(doc, key, room, verifier, frame, admit = () => true) {
 }
 
 /** The owner shares `doc`: the room opened on the relay at `url` (its share endpoint, with the server's token).
- *  Returns { room, key (the link's), editKey (an editor link's, with `editors`), peers(), setView(), close(), ... }.
- *  onEvent({ type: 'peers' | 'closed' | 'error', ... }). editors: editors may change it (their link signs, #3182); an
- *  editor's change refused (an error event) past `limits.total` or outside the files and the drawings (#3527). */
-export async function shareRoom({ url, token = null, doc, user, editors = false, WebSocket: WS = globalThis.WebSocket, onEvent = () => {}, limits = FOLLOW_LIMITS }) {
+ *  Returns { room, key (the link's), editKey (an editor link's, with `editors`), peers(), setView(), connected(),
+ *  close(), ... }. onEvent({ type: 'peers' | 'closed' | 'error' | 'offline' | 'online', ... }). editors: editors may
+ *  change it (their link signs, #3182); an editor's change refused (an error event) past `limits.total` or outside the
+ *  files and the drawings (#3527).
+ *  Its connection lost (#3835), not ended (`close()` not called, the room did not refuse it: REFUSED), the room is
+ *  resumed (`reconnect`: RECONNECT; false: never) with the secret its open was answered with, through a new
+ *  connection: an event { type: 'offline' } at its loss, { type: 'online' } once resumed; each follower then a join
+ *  again (the whole document sent to it: what changed meanwhile). A room the relay no longer keeps (its grace past,
+ *  the relay restarted): the session ends. */
+export async function shareRoom({ url, token = null, doc, user, editors = false, WebSocket: WS = globalThis.WebSocket, onEvent = () => {}, limits = FOLLOW_LIMITS, reconnect = RECONNECT }) {
   const { key, text } = await newKey();
   const signer = editors ? await newSigner() : null;
   // (the room's public key, for every participant: in the document)
@@ -188,40 +196,100 @@ export async function shareRoom({ url, token = null, doc, user, editors = false,
   };
   const awareness = new Awareness(doc);
   awareness.setLocalState({ user, role: 'owner', view: null });
-  let p = null;
-  const c = connection(url, WS, [SUBPROTOCOL, ...(token ? [`token.${token}`] : [])], async msg => {
+  let p = null, room = null, resume = null, cur = null;
+  let ended = null, stopped = false, lostAt = null, timer = null;   // (why it ended; close() called; since when lost)
+  // a frame for one follower, on the connection `c` (a join's answer: on the connection it came on)
+  const sendTo = (c, client, kind, bytes) => c.frame(async () => toFrame(client, await seal(key, room, kind, bytes)));
+  const control = async (c, msg) => {
     if (c.first?.(msg)) { c.first = null; return; }
     if (msg.type === 'join') {   // (someone joined: the whole document and who is in, for them only, #3529)
       const client = Number(msg.client);
       if (!Number.isSafeInteger(client) || client < 0 || client > 0xFFFFFFFF) return;
-      await p.sendTo(client, KIND.update, Y.encodeStateAsUpdate(doc));
-      await p.sendTo(client, KIND.awareness, encodeAwarenessUpdate(awareness, [...awareness.getStates().keys()]));
+      await sendTo(c, client, KIND.update, Y.encodeStateAsUpdate(doc));
+      await sendTo(c, client, KIND.awareness, encodeAwarenessUpdate(awareness, [...awareness.getStates().keys()]));
     } else if (msg.type === 'leave') removeAwarenessStates(awareness, [Number(msg.client)], 'relay');
     else if (msg.type === 'closed') c.closedReason = msg.reason;
     else if (msg.type === 'error') onEvent({ type: 'error', message: String(msg.message || '') });
-  }, async frame => {
-    if (frame[0] === KIND.edit) { await applyEdit(doc, key, p.room, () => verifier, frame, admit).catch(() => false); return; }
+  };
+  const frameIn = async frame => {
+    if (frame[0] === KIND.edit) { await applyEdit(doc, key, room, () => verifier, frame, admit).catch(() => false); return; }
     // (a follower's awareness, marked by the room with who sent it: that follower's own state only, #3360; a follower's
     // update: never applied)
     const from = senderOf(frame);
     if (!from) return;
-    const { kind, bytes } = await unseal(key, p.room, from.frame);
+    const { kind, bytes } = await unseal(key, room, from.frame);
     if (kind === KIND.awareness) applyAwarenessFrom(awareness, bytes, from.client);
-  });
-  try { await c.opened; } catch (e) { awareness.destroy(); throw e; }
-  const answer = firstAnswer(c, 'opened');
-  c.control({ type: 'open', v: PROTOCOL, client: doc.clientID, ...(signer ? { editors: signer.pub } : {}) });
-  let room;
-  try { ({ room } = await answer); } catch (e) { awareness.destroy(); c.ws.close(); throw e; }
-  p = participant({ conn: () => c, room, key, doc, awareness, owner: () => doc.clientID, onEvent });
-  c.ws.addEventListener('close', () => { awareness.destroy(); onEvent({ type: 'closed', reason: c.closedReason || 'the connection to the relay ended' }); }, { once: true });
+  };
+  // a connection, opened and answered (`hello`: the open, or the resume): { c, answer }; its failure thrown
+  const connect = async hello => {
+    const c = connection(url, WS, [SUBPROTOCOL, ...(token ? [`token.${token}`] : [])], msg => control(c, msg), frameIn);
+    try { await c.opened; } catch (e) { c.ws.close?.(); throw e; }
+    const answer = firstAnswer(c, 'opened');
+    c.control({ v: PROTOCOL, client: doc.clientID, ...hello });
+    try { return { c, answer: await answer }; } catch (e) { c.ws.close(); throw e; }
+  };
   const onUpdate = (u, origin) => { if (origin !== 'remote') p.send(KIND.update, u); };
+  const end = reason => {
+    if (ended) return;
+    ended = reason;
+    clearTimeout(timer);
+    globalThis.removeEventListener?.('online', now);
+    doc.off('update', onUpdate);
+    meter.stop();
+    awareness.destroy();
+    onEvent({ type: 'closed', reason });
+  };
+  const use = c => {
+    cur = c;
+    c.ws.addEventListener('close', e => {
+      if (c !== cur || ended) return;
+      const why = c.closedReason || 'the connection to the relay ended';
+      if (stopped || c.closedReason || REFUSED.includes(e?.code) || !reconnect || !resume) { end(why); return; }
+      lostAt = Date.now();
+      onEvent({ type: 'offline', reason: 'the connection to the relay was lost' });
+      later(0);
+    }, { once: true });
+  };
+  const later = n => {
+    const ms = reconnect.delays[Math.min(n, reconnect.delays.length - 1)];
+    if (Date.now() + ms - lostAt > reconnect.for) { end(`the connection to the relay was lost and could not be made again in ${Math.round(reconnect.for / 60_000)} minutes`); return; }
+    timer = setTimeout(() => { timer = null; attempt(n); }, ms);
+  };
+  async function attempt(n) {
+    let j;
+    try { j = await connect({ type: 'resume', room, resume }); } catch (e) {
+      if (ended) return;
+      if (e.message === NOT_SHARED) end('the connection to the relay was lost and the relay no longer kept the room'); else later(n + 1);
+      return;
+    }
+    if (ended) { j.c.ws.close(); return; }
+    lostAt = null;
+    use(j.c);
+    // (this participant's state, its clock past the one the followers knew: taken again where it timed out)
+    awareness.setLocalState({ ...awareness.getLocalState() });
+    onEvent({ type: 'online' });
+  }
+  // (the browser back online: the next try at once)
+  function now() { if (timer !== null) { clearTimeout(timer); timer = null; attempt(0); } }
+  let first;
+  try { first = await connect({ type: 'open', ...(signer ? { editors: signer.pub } : {}) }); } catch (e) { awareness.destroy(); meter.stop(); throw e; }
+  ({ room } = first.answer);
+  resume = typeof first.answer.resume === 'string' ? first.answer.resume : null;
+  p = participant({ conn: () => cur, room, key, doc, awareness, owner: () => doc.clientID, onEvent });
+  use(first.c);
+  if (reconnect) globalThis.addEventListener?.('online', now);
   doc.on('update', onUpdate);
-  c.ws.addEventListener('close', () => { doc.off('update', onUpdate); meter.stop(); }, { once: true });
   return {
     ...p, key: text, editKey: signer?.text || null,
+    closed: () => ended !== null,
+    /** Connected now (false: its connection lost, the room being resumed, or the session ended). */
+    connected: () => !ended && lostAt === null,
     /** Stops sharing: the room closed for everyone. */
-    close: async () => { c.closedReason = 'sharing stopped'; c.control({ type: 'close' }); await c.frame(() => null); c.ws.close(); },
+    close: async () => {
+      stopped = true;
+      if (lostAt !== null) { end('sharing stopped'); return; }
+      cur.closedReason = 'sharing stopped'; cur.control({ type: 'close' }); await cur.frame(() => null); cur.ws.close();
+    },
   };
 }
 
@@ -289,11 +357,14 @@ export async function followRoom({ url, room, key: keyText, sign = null, user, W
     if (mine.length > 32) mine.splice(0, mine.length, Y.mergeUpdates(mine));
     sendEdit(u);
   };
-  // (the whole document, as the owner sends it at a join: every client's from its start, the owner's first)
-  const catchUp = bytes => {
-    if (!signer || !mine.length) return;
+  // (the whole document, as the owner sends it at a join: every client's from its start, the owner's first; again
+  // once it has arrived, the owner's room resumed (#3835): this participant's state sent again, its clock past the one
+  // the owner knew, which may have timed out meanwhile)
+  const catchUp = (bytes, again) => {
     const { from, to } = Y.parseUpdateMeta(bytes);
     if (from.get(owner) !== 0) return;
+    if (again && lostAt === null) awareness.setLocalState({ ...awareness.getLocalState() });
+    if (!signer || !mine.length) return;
     const theirs = Y.encodeStateVector(new Map([[doc.clientID, to.get(doc.clientID) ?? 0]]));
     sendEdit(Y.diffUpdate(Y.mergeUpdates(mine), theirs));
   };
@@ -318,7 +389,8 @@ export async function followRoom({ url, room, key: keyText, sign = null, user, W
       // (#3527: an update that changes a root of no shared project's: left, not applied)
       const outside = updateOutside(doc, m.bytes);
       if (!outside) Y.applyUpdate(doc, m.bytes, 'remote');
-      if (!capped(c, m.bytes.length, outside)) { synced(); if (!outside) catchUp(m.bytes); }
+      const again = arrived;
+      if (!capped(c, m.bytes.length, outside)) { synced(); if (!outside) catchUp(m.bytes, again); }
     }
     else if (m.kind === KIND.awareness) applyAwarenessFrom(awareness, m.bytes);   // (the owner's: who is in)
   };

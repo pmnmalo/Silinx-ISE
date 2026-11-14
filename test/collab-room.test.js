@@ -5,8 +5,8 @@
 // owner, by Stop Sharing or the connection lost. The rooms over the server's WebSockets: test/collab.test.js.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { collabRooms, ROOM_LIMITS } from '../core/collab-room.js';
-import { KIND, PROTOCOL, fromFrame, toFrame, senderOf } from '../core/collab-client.js';
+import { collabRooms, ROOM_LIMITS, OWNER_LOST } from '../core/collab-room.js';
+import { KIND, PROTOCOL, NOT_SHARED, fromFrame, toFrame, senderOf } from '../core/collab-client.js';
 import { ROOM_RE } from '../core/collab-link.js';
 
 // a participant: what it was sent (text as JSON, binary as bytes), how it was closed
@@ -31,7 +31,9 @@ function room(limits) {
 test('an owner opens a room; followers join it: the owner told, each follower the owner\'s client', () => {
   const { host, owner, id, join } = room();
   assert.match(id, ROOM_RE);
-  assert.deepEqual(owner.got, [{ type: 'opened', room: id }]);
+  assert.deepEqual(owner.got, [{ type: 'opened', room: id, resume: owner.got[0].resume }]);
+  assert.match(owner.got[0].resume, /^[A-Za-z0-9_-]{22}$/);   // (#3835: its resume's secret, 128 bits)
+  assert.notEqual(room().owner.got[0].resume, owner.got[0].resume);
   const [a] = join(7), [b] = join(8);
   assert.deepEqual(a.got, [{ type: 'joined', owner: 1 }]);
   assert.deepEqual(b.got, [{ type: 'joined', owner: 1 }]);
@@ -88,6 +90,7 @@ test('who leaves: the others told; the room ends with its owner, by Stop Sharing
   o.message(JSON.stringify({ type: 'close' }), false);
   assert.equal(host.rooms.has(id), false);
   assert.deepEqual([b.got.at(-1), b.closed, owner.closed], [{ type: 'closed', reason: 'the owner stopped sharing' }, [1000, 'closed'], [1000, 'closed']]);
+  assert.deepEqual(owner.got.at(-1), { type: 'closed', reason: 'the owner stopped sharing' });   // (#3835: no loss to resume)
   assert.equal(a.closed, null);
   // (the owner's connection lost)
   const r2 = room();
@@ -95,6 +98,64 @@ test('who leaves: the others told; the room ends with its owner, by Stop Sharing
   r2.o.close();
   assert.equal(r2.host.rooms.size, 0);
   assert.deepEqual(c.got.at(-1), { type: 'closed', reason: 'the owner stopped sharing' });
+});
+
+test('#3835 the owner\'s connection lost, with a grace: the room kept, its followers with it; resumed with its secret, every follower a join again', () => {
+  const { host, owner, o, id, join } = room({ grace: 60_000 });
+  const secret = owner.got[0].resume;
+  const [a, pa] = join(7);
+  o.close();
+  assert.equal(host.rooms.has(id), true);
+  assert.equal(a.closed, null);
+  assert.equal(host.rooms.get(id).owner, null);
+  // meanwhile: another follower joins, a follower's awareness reaches the others only (no owner), one leaves
+  const [b] = join(8);
+  assert.deepEqual(b.got, [{ type: 'joined', owner: 1 }]);
+  pa.message(frame(KIND.awareness, 9), true);
+  assert.deepEqual(b.got.at(-1), [...fromFrame(7, frame(KIND.awareness, 9))]);
+  const [c, pc] = join(9);
+  pc.close();
+  assert.equal(c.closed, null);
+  // refused: another room, another secret, another client id; a follower's endpoint
+  const tryResume = (msg, role = 'owner') => { const s = socket(); host.welcome(s, role).message(text({ type: 'resume', room: id, resume: secret, client: 1, ...msg }), false); return s; };
+  for (const bad of [{ room: 'x'.repeat(22) }, { resume: 'y'.repeat(22) }, { resume: secret.slice(1) }, { resume: undefined }, { client: 2 }]) {
+    const s = tryResume(bad);
+    assert.deepEqual([s.got, s.closed], [[{ type: 'error', message: NOT_SHARED }], [1008, 'refused']], JSON.stringify(bad));
+  }
+  assert.deepEqual(tryResume({}, 'follower').closed, [1008, 'refused']);
+  // resumed: opened again, each follower a join; the owner's frames reach them again
+  const s = socket(), ps = host.welcome(s, 'owner');
+  ps.message(text({ type: 'resume', room: id, resume: secret, client: 1 }), false);
+  assert.deepEqual(s.got, [{ type: 'opened', room: id, resume: secret }, { type: 'join', client: 7 }, { type: 'join', client: 8 }]);
+  ps.message(frame(KIND.update, 5), true);
+  assert.deepEqual([a.got.at(-1), b.got.at(-1)], [[KIND.update, 5], [KIND.update, 5]]);
+  // (and it ends as any: Stop Sharing)
+  ps.message(JSON.stringify({ type: 'close' }), false);
+  assert.equal(host.rooms.has(id), false);
+  assert.deepEqual(a.got.at(-1), { type: 'closed', reason: 'the owner stopped sharing' });
+});
+
+test('#3835 a resume replaces an owner\'s connection not seen lost yet: the old one closed, its frames and its end ignored; past the grace, the followers told', async () => {
+  const { host, owner, o, id, join } = room({ grace: 60_000 });
+  const [a] = join(7);
+  const s = socket(), ps = host.welcome(s, 'owner');
+  ps.message(text({ type: 'resume', room: id, resume: owner.got[0].resume, client: 1 }), false);
+  assert.deepEqual(owner.closed, [1000, 'resumed']);
+  owner.readyState = 1;   // (as if its frames still came)
+  o.message(frame(KIND.update, 1), true);
+  assert.deepEqual(a.got, [{ type: 'joined', owner: 1 }]);
+  o.close();
+  assert.equal(host.rooms.get(id).owner, s);
+  // past the grace (here 20 ms): closed, the followers told why
+  const r = room({ grace: 20 });
+  const [b] = r.join(8);
+  r.o.close();
+  await new Promise(res => setTimeout(res, 60));
+  assert.equal(r.host.rooms.size, 0);
+  assert.deepEqual([b.got.at(-1), b.closed], [{ type: 'closed', reason: OWNER_LOST }, [1000, 'closed']]);
+  assert.equal(OWNER_LOST, 'the owner\'s connection was lost');
+  // (no grace, the default but on the relay: closed at once, as before)
+  assert.equal(ROOM_LIMITS.grace, 0);
 });
 
 test('the first message: the role\'s, this version, a client id; the time to it', async () => {

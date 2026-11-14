@@ -12,7 +12,8 @@
 // import gate, the project untrusted from an editor's first change (#3355). Its drawings edited live (#3183): each one a
 // structure of its own in the document (core/collab-model.js), its open editor bound to it (collab-drawing.js); what an
 // editor changes in one is written to the disk (through the gate too) and its HDL generated again, as the page's own
-// changes are.
+// changes are. Its connection to the relay lost (#3835), the room is resumed on its own: "Reconnecting…" in the toolbar
+// meanwhile, the loss and the return in the console; its followers keep it as it was, and get what changed once back.
 import { api } from './api.js';
 import { h, dialog } from './ui.js';
 import { S, app } from './app.js';
@@ -206,7 +207,8 @@ const commands = () => [
 function draw() {
   if (!share) { renderPresence(); return; }
   const peers = share.session.peers();
-  renderPresence({ label: peers.length ? `Sharing (${peers.length})` : 'Sharing', me: { name: share.name, role: 'owner', color: colorOf(share.doc.clientID), me: true }, peers });
+  const label = share.session.connected?.() === false ? 'Reconnecting…' : peers.length ? `Sharing (${peers.length})` : 'Sharing';
+  renderPresence({ label, me: { name: share.name, role: 'owner', color: colorOf(share.doc.clientID), me: true }, peers });
 }
 
 function onEvent(ev) {
@@ -218,7 +220,9 @@ function onEvent(ev) {
     for (const [c, n] of share.known) if (!now.has(c)) app.log(`${n} no longer follows your project.`, 'info');
     share.known = now;
     draw();
-  } else if (ev.type === 'closed') stopSharing(`Sharing "${share.project}" ended: ${ev.reason}.`);
+  } else if (ev.type === 'offline') { app.log(`WARNING: Sharing "${share.project}": the connection to the relay was lost: reconnecting (your followers see the project as it was until it is back).`, 'warn'); draw(); }
+  else if (ev.type === 'online') { app.log(`Sharing "${share.project}": reconnected to the relay: your followers see your changes made meanwhile.`, 'info'); draw(); }
+  else if (ev.type === 'closed') stopSharing(`Sharing "${share.project}" ended: ${ev.reason}.`);
   else if (ev.type === 'error') app.log(`WARNING: Share Project: ${ev.message}.`, 'warn');
 }
 

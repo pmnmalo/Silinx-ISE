@@ -7,14 +7,16 @@
 //   accepted (in its subprotocols: `silinx-collab`, `token.<token>`); joining one needs its room id;
 // - frames: RELAY_LIMITS, by role: each endpoint its own maximum, so a follower's frame larger than theirs closes its
 //   connection (1009) before it is received whole, and only a token opens a socket that takes the owner's;
-// - a connection that no longer answers its pings: closed (its room with it, an owner's).
+// - a connection that no longer answers its pings: closed (an owner's room kept RELAY_LIMITS.grace for its resume,
+//   #3835, then closed).
 import { WebSocketServer } from 'ws';
 import { SUBPROTOCOL } from '../core/collab-client.js';
 import { collabRooms, fail, ROOM_LIMITS } from '../core/collab-room.js';
 
 const RELAY_PATH = '/api/collab';
 export { SUBPROTOCOL };
-export const RELAY_LIMITS = Object.freeze({ ownerFrame: 16 << 20, followerFrame: 64 << 10, ...ROOM_LIMITS, ping: 30_000 });
+// (grace: an owner's connection lost, its room kept that long for its resume, #3835)
+export const RELAY_LIMITS = Object.freeze({ ownerFrame: 16 << 20, followerFrame: 64 << 10, ...ROOM_LIMITS, ping: 30_000, grace: 120_000 });
 // the token an owner's upgrade carries in its subprotocols (`token.<token>`), or null
 const tokenOfUpgrade = req => String(req.headers['sec-websocket-protocol'] || '').split(',').map(s => s.trim()).find(s => s.startsWith('token.'))?.slice(6) || null;
 const ROLES = { [`${RELAY_PATH}/share`]: 'owner', [`${RELAY_PATH}/follow`]: 'follower' };
